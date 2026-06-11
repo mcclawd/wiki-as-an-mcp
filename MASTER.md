@@ -133,9 +133,10 @@ After each launch/resume/evaluation cycle, report: what's running, what's comple
 (scored/24), what's stuck and why, and the results grid so far. Then wait for the
 human — do not start new roster entries on your own.
 
-**Report format (per the human's preference):** on every progress check show ONE
-single unified roster table containing ALL runs (one row per entry × run index),
-grouped by run index — the whole run-1 block first, then run-2, etc.
+**Report format (per the human's preference):** on every progress check show the
+FULL roster once per run index — the whole run-1 table (all 15 entries) first,
+then run-2, then run-3, etc.; not-yet-launched entries say "not started".
 Keep status cells short — state + numbered marks (e.g. `✅ COMPLETE 24/24 ⚠¹`) —
-and explain every mark as bullet points BELOW the table. Never put long
-explanations inside table cells. Long tables are fine.
+and put each run's footnote bullets DIRECTLY UNDER that run's table (only the
+marks used there), never one combined block at the end. No long explanations
+inside table cells. Long output is fine.

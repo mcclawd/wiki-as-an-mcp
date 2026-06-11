@@ -70,3 +70,22 @@ fabrications are detectable. Be complete — it's cheaper than getting caught.
 - `MASTER.md`, `RUNBOOK.md`, and `operator/` are for the *operator* that
   launches benchmark runs — they are not part of your task. Your contract is
   this file plus the plan the operator hands you.
+
+---
+
+## 🎛 Operator-Only: Roster Progress-Report Format
+
+*(For the master operator agent. Benchmark agents: this section is not part
+of your task — ignore it.)*
+
+On every progress check, report the FULL roster once per run index:
+the complete run-1 table (all 15 entries), then run-2, then run-3, etc.
+
+- Columns: `# | harness | label | model (verbatim) | lane | status`.
+- Status cells stay short: state + scored count + numbered marks
+  (e.g. `✅ 24/24 ⚠¹`). Never long explanations inside cells.
+- Entries not yet launched read exactly **not started**.
+- **Each run's table is followed immediately by its own "Marks" bullet
+  list** (only the footnotes used in that table) — never one combined
+  footnote block at the end of the report.
+- Long output is fine; completeness beats brevity here.
