@@ -58,13 +58,20 @@ three-arm comparison, and the evidence standard: [`FINDINGS.md`](FINDINGS.md)
 
 ## Repo map
 
+This repo is **operator territory** — benchmark agents never run inside it. Each
+experimental arm lives under `conditions/` and is materialized into a **clean-room
+workspace** (`operator/make-workspace.sh <condition>`) containing only that arm's
+contracts + wiki + the spec. Knowledge separation is physical: an agent cannot read
+a wiki that does not exist in its workspace.
+
 | path | what |
 |---|---|
 | [`FINDINGS.md`](FINDINGS.md) | the analysis: what the wiki did and didn't do |
 | [`OPERATOR.md`](OPERATOR.md) | how to set up and run the benchmark |
+| `conditions/` | the experimental arms: `wiki-0531/`, `wiki-0530/`, `no-wiki/` (each = agent contracts + wiki payload) |
+| `operator/make-workspace.sh` · `check-structure.sh` | materialize a clean-room agent workspace; verify it matches its `CONDITION.txt` stamp |
 | `MASTER.md` · `RUNBOOK.md` · `roster.yaml` | operator-agent playbook, per-harness launch commands, model grid |
-| `CLAUDE.md` · `AGENTS.md` · `GEMINI.md` | the benchmark agent's contract |
-| `plan_v5.md` · `checklist_v5.md` | the task spec the agent implements |
-| `knowledge-base/` | the wiki under test (snapshot 0531) |
+| `CLAUDE.md` · `AGENTS.md` · `GEMINI.md` | operator orientation (the *benchmark* contracts live in `conditions/<arm>/`) |
+| `plan_v5.md` · `checklist_v5.md` | the task spec (invariant across all arms) |
 | `evaluator/` | the sealed scoring API |
-| `do_not_read/` | operator-only artifacts — off-limits to benchmark agents |
+| `do_not_read/` | operator-only analysis vault — never materialized into workspaces |

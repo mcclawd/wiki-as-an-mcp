@@ -34,3 +34,8 @@ secrets/
 *.bundle
 __pycache__/
 **/__pycache__/
+
+# ===== clean-room: knowledge-base is materialized into agent workspaces, never at repo root =====
+# (anchored to root — conditions/*/knowledge-base/ IS tracked)
+/knowledge-base/
+/CONDITION.txt

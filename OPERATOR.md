@@ -21,10 +21,11 @@ fresh clone to a running benchmark.
   API, launches the benchmark agents, resumes them when they stall, evaluates results.
   Your guides are this file, **`MASTER.md`** (the operator-agent playbook),
   **`RUNBOOK.md`** (per-harness launch commands), and `setup.sh`.
-- **Benchmark agent**: the model under test. It reads **`CLAUDE.md`** (+ `AGENTS.md` /
-  `GEMINI.md`) and `knowledge-base/`, and must **not** read `do_not_read/`,
-  `FINDINGS.md`, or `README.md`. You don't write its code — you launch it and it does
-  the work.
+- **Benchmark agent**: the model under test. It runs in a **materialized workspace**
+  (built by `operator/make-workspace.sh`) and reads only what's there: its arm's
+  contracts (`CLAUDE.md`/`AGENTS.md`/`GEMINI.md`), `knowledge-base/` (if the arm has
+  one), and the spec. `do_not_read/`, `FINDINGS.md`, other arms' wikis — physically
+  absent from its world. You don't write its code — you launch it and it does the work.
 
 ## What's in here
 | path | what |
@@ -32,7 +33,7 @@ fresh clone to a running benchmark.
 | `CLAUDE.md` · `AGENTS.md` · `GEMINI.md` | the benchmark agent's contract (one per harness family) |
 | `plan_v5.md` · `checklist_v5.md` | the task spec the agent implements |
 | `MASTER.md` | the master operator agent's playbook: start → monitor → resume → evaluate |
-| `knowledge-base/` | the knowledge wiki the agent consults (snapshot 0531 — see `knowledge-base/WIKI_VERSION.txt`) |
+| `conditions/` | the experimental arms (`wiki-0531/`, `wiki-0530/`, `no-wiki/`): agent contracts + wiki payload each |
 | `evaluator/` | the sealed scoring API: `app.R` (plumber), `Dockerfile`, 6 dataset manifests |
 | `operator/` | run tooling: auto-resume loops, results aggregator, eval-API watchdog (paths self-locate) |
 | `setup.sh` · `smoke.sh` · `.env.example` | environment bootstrap, end-to-end check, config |
@@ -74,11 +75,23 @@ cp .env.example .env       # then edit: the eval-API token + your harness API ke
 `smoke.sh` prints a Gini value if the whole pipeline — data → fit → submit → score —
 works. Green here means the box is ready.
 
-### 4. Launch a benchmark run
-Follow **`RUNBOOK.md`** for the exact per-harness command. In short: export the run
-env, hand the agent the prompt from `task_prompt.template.txt`, and let it run (2–4 h
-typical). A run is **complete when its `results/summary.csv` has all 24 cells
-(6 datasets × 4 models) populated with a non-NA `mean_eval_gini`.**
+### 4. Materialize the arm's clean-room workspace
+Agents never run inside the repo. Pick the condition and build its workspace:
+```bash
+operator/make-workspace.sh wiki-0531        # or wiki-0530 / no-wiki / exp-*
+operator/check-structure.sh ~/bench/ws-wiki-0531   # must print PASS
+```
+The workspace contains only that arm's contracts + wiki (if any) + the spec +
+`CONDITION.txt` (condition, repo SHA, wiki version — recorded provenance). Other
+arms' wikis, `conditions/`, `do_not_read/`, and analysis docs physically don't
+exist there — that's the knowledge separation.
+
+### 5. Launch a benchmark run
+Follow **`RUNBOOK.md`** for the exact per-harness command, **with cwd = the
+workspace**. In short: export the run env (`WIKI_VERSION` derived from
+`CONDITION.txt`), hand the agent the prompt from `task_prompt.template.txt`, and let
+it run (2–4 h typical). A run is **complete when its `results/summary.csv` has all
+24 cells (6 datasets × 4 models) populated with a non-NA `mean_eval_gini`.**
 
 ## Notes
 - **Secrets:** `evaluator/secrets/secrets.rds` is gitignored. The API runs without it

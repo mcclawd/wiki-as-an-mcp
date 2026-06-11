@@ -9,12 +9,15 @@ benchmark by launching, babysitting, resuming, and evaluating runs performed by
   them and judge their output.
 - Do **not** read anything under `do_not_read/`. Everything you need to launch and
   evaluate is top-level (`RUNBOOK.md`, `roster.yaml`, this file) — never `do_not_read/`.
-- This is the **wiki arm**: `knowledge-base/` is present and is part of the *benchmark
-  agents'* context (their contract `CLAUDE.md`/`AGENTS.md`/`GEMINI.md` tells them to
-  consult it). That is intended — you do not strip it, and you do not read it as
-  instructions for yourself. Every launch uses `WIKI_VERSION=0531` (the snapshot in
-  the repo; see `knowledge-base/WIKI_VERSION.txt`), so run folders are named
-  `…-wiki0531-…`.
+- **Arms are clean-room workspaces — agents never run inside this repo.** The
+  payloads live under `conditions/` (`wiki-0531`, `wiki-0530`, `no-wiki`, `exp-*`).
+  For the arm the human names: `operator/make-workspace.sh <condition>` →
+  `operator/check-structure.sh <ws>` must print **PASS** → launch with cwd = that
+  workspace (RUNBOOK has the commands). The workspace's `CONDITION.txt` is the
+  ground truth for which wiki the run read; derive `WIKI_VERSION` from it, never
+  hand-type it. Never copy `conditions/`, `do_not_read/`, `paper/`, or
+  `FINDINGS.md` into a workspace. The agent contracts inside `conditions/<arm>/`
+  are for the *benchmark agents* — not instructions for you.
 - **Leakage discipline on resume:** when you re-prompt a stalled benchmark agent,
   restate the *completion criterion* only — never a dataset-specific *fix*. The wiki
   deliberately omits those; the agent must discover them from its own R warnings. You
@@ -36,18 +39,21 @@ nohup bash operator/eval-api-watchdog.sh > /dev/null 2>&1 &
 One run = one `roster.yaml` entry (a harness + exact model string + thinking level)
 over all 6 datasets × 4 models × 10 trials.
 
-1. Load env: `set -a; . ./.env; set +a`, then export per-run values:
+0. Materialize + verify the arm's workspace (once per condition; reusable across runs):
+   `operator/make-workspace.sh <condition>` then `operator/check-structure.sh <ws>`
+   → must PASS. `cd` into the workspace.
+1. Load env: `set -a; . <repo>/.env; set +a`, then export per-run values:
    `RUN_INDEX=<n>` (seed base: per-trial seed = `1000*RUN_INDEX + trial`),
-   `WIKI_VERSION=0531`, `THINKING_LEVEL=<roster label>`.
+   `WIKI_VERSION` derived from `CONDITION.txt` (see RUNBOOK), `THINKING_LEVEL=<roster label>`.
 2. Fill `task_prompt.template.txt` → `task_prompt.txt`: `{MODEL}` and `{THINKING}`
-   from the roster entry, `{HARNESS}` = the harness name, `{WORKSPACE}` = the repo
-   root's absolute path, `{WIKI_VERSION}` = `0531`.
-3. Launch with the **exact per-harness command in `RUNBOOK.md`** (each is
-   nohup-detached; openclaw needs a unique `--session-key`).
-4. Record it: append one line to `runs.log` at the repo root —
+   from the roster entry, `{HARNESS}` = the harness name, `{WORKSPACE}` = the
+   **workspace's** absolute path, `{WIKI_VERSION}` from the stamp.
+3. Launch with the **exact per-harness command in `RUNBOOK.md`**, cwd = the
+   workspace (each is nohup-detached; openclaw needs a unique `--session-key`).
+4. Record it: append one line to `runs.log` in the workspace —
    `<UTC> | <roster id> | <run folder once it appears> | <session-key if openclaw> | launched`.
    The run folder appears as
-   `run-<harness>-<model>-<thinking>-run<X>-wiki0531-<UTC>` within a few minutes.
+   `run-<harness>-<model>-<thinking>-run<X>-wiki<ver>-<UTC>` within a few minutes.
 
 Quota discipline: never run two models of the same provider account concurrently
 (zai models especially — shared quota, they throttle each other). Different
@@ -95,9 +101,10 @@ tail of its `run.log` — don't loop forever.
 ## 4. Evaluate
 
 ```bash
-python3 operator/collect-results.py            # completeness: scored/24 per run
-python3 operator/collect-results.py --tidy     # tidy CSV of every (run, dataset, model) row
+python3 <repo>/operator/collect-results.py --root <ws> [...]   # completeness: scored/24 per run
+python3 <repo>/operator/collect-results.py --tidy --root <ws>  # tidy CSV of every (run, dataset, model) row
 ```
+Pass each workspace you launched from via `--root` (e.g. `--root ~/bench/ws-wiki-0531 ~/bench/ws-no-wiki`).
 
 For each finished run report:
 - **scored/24** and which combos failed (dataset, model, and the root-cause error

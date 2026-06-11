@@ -8,13 +8,28 @@ results/summary.csv with a real non-NA mean_eval_gini).
          for every run to stdout, for pivoting/comparison.
 
 Usage:
-  python3 operator/collect-results.py [--tidy]
+  python3 operator/collect-results.py [--tidy] [--root DIR ...]
+  --root DIR : scan run-* under DIR(s) instead of the repo root — pass each
+               clean-room workspace, e.g. --root ~/bench/ws-wiki-0531 ~/bench/ws-no-wiki
+               (globs expanded by your shell work too: --root ~/bench/ws-*)
 """
 import csv, glob, os, sys
 
 WS = os.environ.get("WORKSPACE") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TARGET = 24  # 6 datasets x 4 models
 V5_MODELS = {"tweedie_gam", "grplasso", "grpnet", "tdboost"}  # GLM dropped in v5
+
+
+def roots_from_argv():
+    if "--root" not in sys.argv:
+        return [WS]
+    i = sys.argv.index("--root")
+    roots = []
+    for a in sys.argv[i + 1:]:
+        if a.startswith("--"):
+            break
+        roots.append(os.path.expanduser(a))
+    return roots or [WS]
 
 
 def rows_for(run_dir):
@@ -32,9 +47,10 @@ def is_scored(row):
 
 def main():
     tidy = "--tidy" in sys.argv
-    runs = sorted(glob.glob(os.path.join(WS, "run-*")))
+    roots = roots_from_argv()
+    runs = sorted(r for root in roots for r in glob.glob(os.path.join(root, "run-*")))
     if not runs:
-        print(f"no run-* folders under {WS}", file=sys.stderr)
+        print(f"no run-* folders under: {', '.join(roots)}", file=sys.stderr)
         sys.exit(1)
 
     if tidy:
