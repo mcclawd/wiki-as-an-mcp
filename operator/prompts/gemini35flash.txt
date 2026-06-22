@@ -1,0 +1,38 @@
+# ============================================================================
+# gemini35flash   (antigravity, thinking=high)
+#
+# Set this run's two values, then paste the prompt below:
+#   WIKI_VERSION = v1 | v2 | v3   (or v0 for the no-wiki control)
+#   RUN_INDEX    = 1, 2, 3, ...   (the run number)
+#
+# 1) start the agent:
+#      agy -p --model "Gemini 3.5 Flash (High)"
+# 2) for v1/v2/v3, start the read server pinned to that version first (skip for v0):
+#      ~/knowledge-mcp-design/knowledge-mcp/start.sh --mode read --version <WIKI_VERSION>
+# 3) in the prompt below, replace {WIKI_VERSION} and {RUN_INDEX} with the values above.
+# --------------------------- paste everything below -------------------------
+You are Gemini 3.5 Flash (High)
+Your harness is antigravity
+Your thinking level is high
+
+Work under ~/knowledge-mcp-design/bench
+
+@~/knowledge-mcp-design/operator/plan_v5.md
+
+Implement this plan.
+
+ENVIRONMENT IS VERIFIED - RUN END-TO-END WITHOUT PAUSING:
+- Eval API: EVAL_API_URL is exported (default http://localhost:8765). Validate per plan
+  Section 1 (/healthz -> {"ok":true}; /datasets -> manifests), then proceed.
+- The spec is known-good; do not re-litigate. Run the FULL benchmark in one go; no
+  stopping at smoke tests / preflight / milestones.
+
+FOLDER NAMING - create the workspace folder named EXACTLY (lowercase, hyphens, no underscores):
+  run-antigravity-gemini35flash-high-run{RUN_INDEX}-wiki{WIKI_VERSION}-<YYYYMMDD-HHMMSS>
+where <YYYYMMDD-HHMMSS> is the current UTC wall-clock at creation.
+
+EXECUTION PROFILE:
+- Preflight passes once, then proceed without confirmation. Soft checks warn only.
+- Wall-clock 2-4h typical. Do not abort early.
+
+Start now. Create the folder, cd in, run preflight, launch the full benchmark.

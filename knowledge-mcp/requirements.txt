@@ -1,0 +1,3 @@
+# knowledge-mcp server — single dependency.
+# `mcp` ships the official Python SDK including mcp.server.fastmcp.FastMCP.
+mcp>=1.2.0

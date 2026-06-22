@@ -1,290 +1,241 @@
-# auto-insurance — an LLM-agent generalization benchmark
+# knowledge-mcp-design
 
-**The question:** if you hand an AI coding agent a curated knowledge wiki, does it
-actually do better work on data it has never seen?
+One server that serves a versioned knowledge base (an OKF wiki) to LLM agents and lets a
+manager maintain it. It backs an auto-insurance Tweedie/GLM benchmark: an agent answers a
+modeling task, with or without the wiki, across three wiki arms (good, silent-defect,
+stronger-defect). A run is pinned to one frozen arm so its knowledge cannot change mid-run,
+and the arms must all be servable at the same time.
 
-**The setup:** an AI agent is dropped into a workspace and asked to autonomously write
-R that fits four insurance pricing models (Tweedie GAM, grouped lasso, grouped elastic
-net, boosted trees) across **six held-out insurance datasets**, scored by Gini against
-a sealed eval API. The wiki was built from a *reserved* corpus — the benchmark datasets
-are deliberately absent from it, so any dataset-specific fix has to be discovered by
-the agent itself. We ran the same agents three ways: **no wiki**, with the **original
-wiki (0530)**, and with an **updated wiki (0531)**.
+This README is the living design doc. It records what the system is, the problems a full
+per-file audit found (2026-06-21), and the design choices that make it robust.
 
-> 🛠 **Want to run it?** [`OPERATOR.md`](OPERATOR.md) (humans) and [`MASTER.md`](MASTER.md)
-> (operator agents). ⚠️ *Benchmark agents must not read this file or
-> [`FINDINGS.md`](FINDINGS.md) — they reveal the held-out fixes. (They can't anyway:
-> agents run in generated workspaces that physically don't contain these files — see
-> "How the experiment is isolated" below.)*
+## The four folders
 
----
-
-## The one-sentence finding
-
-> An agent handed a wiki does not *learn* from it — it **copies the example code and
-> skims the explanations**. So a wiki helps only where its runnable example is safe to
-> copy onto unseen data, and it harms wherever the example looks correct but hides a
-> silent flaw — which is exactly the failure the wiki's own update left untouched.
-
----
-
-## Key results, as questions and answers
-
-### Does reading more of the wiki help?
-**No — reading volume predicts nothing.** Heavy readers landed at both the top and the
-bottom; one of the best runs read only 10 of ~50 pages.
-
-```
-score on the two decisive cells (each ● = one wiki run)
-
- best  +0.22 |  ● opus47-r2 (10pg)        ● gpt5.5 (49pg)  ● flash-r1 (48pg)
-       +0.10 |                            ● ocl-gpt5.5 (49pg)
-        0.00 |  ● sonnet46-r2 (11pg)
-       -0.07 |                            ● gpt5.4 (49pg)
-       -0.15 |                            ● gpt5.3 (49pg)
- worst -0.20 |  ● g3.1pro (6) ● sonnet46-r1 (14)   ● flash-r2 (36pg)
-             +----------------------------------------------------------
-                LIGHT readers (3–14 pages)   HEAVY readers (36–49 pages)
-
-      → both groups span top-to-bottom. Reading ≠ outcome.
-```
-
-### How is the agent *supposed* to use the wiki?
-The workspace contract prescribes a four-step loop — orient, target, read, check —
-ending in code that cites its sources:
-
-```
-   ┌──────────────────────────────────────────────────────────────┐
-   │  workspace root: CLAUDE.md (auto-loaded contract)            │
-   │  "You MUST consult the wiki before writing modeling code.    │
-   │   Prefer examples/*.R — copy verbatim, then modify.          │
-   │   Cite every decision as [[PageName]]. Skipping = failure."  │
-   └───────────────────────────────┬──────────────────────────────┘
-                                   ▼
-   │  STEP 1 — ORIENT   index.md (catalog) · overview.md          │
-   │                    (synthesis) · the wiki's own CLAUDE.md    │
-                                   ▼
-   │  STEP 2 — TARGET   grep -rli <every task term> wiki/         │
-                                   ▼
-   ┌──────────────────────────────────────────────────────────────┐
-   │  STEP 3 — READ every match, all three page types             │
-   │   concepts/<Method>.md      sources/<paper>.md               │
-   │   · when to use, hyperparams· canonical API from the paper   │
-   │   · COMMON PITFALLS         · quirks + FAILURE MODES         │
-   │              └──────────┬──────────┘                         │
-   │                         ▼                                    │
-   │             examples/<method>.R                              │
-   │             · verified runnable demo ← the active ingredient │
-   └───────────────────────────────┬──────────────────────────────┘
-                                   ▼
-   │  STEP 4 — before each package call, re-read that page's      │
-   │           Argument Quirks + Failure Modes + Code Example     │
-                                   ▼
-   ┌──────────────────────────────────────────────────────────────┐
-   │  ACT — copy the example verbatim → adapt to this data →      │
-   │        cite [[Pages]] in comments → log reads to trajectory  │
-   └──────────────┬──────────────────────────────┬────────────────┘
-                  ▼                              ▼
-     run R → error? debug from the      wiki had nothing? log it in
-     message + Failure Modes, loop      gaps.md, proceed citing
-     until OK                           "no wiki support"
-```
-
-### …and how do they actually use it?
-**They execute the reading steps, but only the example shapes the code:**
-
-```
-   DESIGNED:  orient → grep → read concepts+sources+examples → check quirks → write
-   OBSERVED:  skim index ─────────────────────► copy examples/<method>.R → ship
-                          (concepts read but not applied; warnings seen but overridden)
-```
-
-The cleanest proof: one agent read 49 pages, *saw* R's warning that its model hadn't
-converged, *wrote the correct fix in its own reasoning* — and still shipped the
-example's flawed call. Two other agents copied the same example so faithfully their
-failures were **byte-identical to 13 decimals**. Reading produces *citations*; the
-example alone produces the *code* — which is why a flaw in `examples/` propagates even
-to agents that read everything, and why fixes placed in explanation prose never landed.
-
-### How much code decides success?
-**About four tokens.** Two small settings in one model call separate success from
-worse-than-random — and having the wiki made agents *less* likely to write them
-(27% vs 50% without the wiki), because the clean-looking example suppressed their own
-debugging instinct.
-
-```
-did the run add the 2-line fix?    →    outcome on the hardest dataset
-
-  YES  (8 runs)   ok ███████ 7      borderline █ 1      failed  0
-  NO  (16 runs)   ok █ 1            borderline ██ 2     failed █████████████ 13
-
-how often agents wrote the fix
-  no wiki    ██████████  50%   (5 of 10 runs)
-  with wiki  █████▌      27%   (4 of 15 runs)   ← the wiki made it LESS likely
-```
-
-### Which failures get fixed, and which get shipped?
-**Loud failures get fixed; quiet ones get shipped.** Every crash was debugged and
-repaired by the agent. Every silent underperformance was submitted unnoticed. The
-dangerous wiki content is not wrong code that crashes — it's plausible code that
-quietly scores low.
-
-```
-                 the copied example has a flaw
-                            │
-              ┌─────────────┴──────────────┐
-        fails LOUD                    fails QUIET
-     (crash / error msg)         (runs fine, scores low)
-              │                            │
-     agent sees the error           nothing to notice
-     debugs, repairs it             agent ships it as-is
-              │                            │
-        ✔ recovers                  ✘ bad model submitted
-```
-
-### The four ways runs actually failed
-
-| # | what happened | root cause (verified in code/logs) | loud or quiet? |
-|---|---|---|---|
-| 1 | basic model silently diverged | example omitted two safety settings | quiet |
-| 2 | grouped model collapsed to ~useless | numeric columns not scaled | quiet |
-| 3 | smooth-curve model crashed | copied setting didn't suit the new data | **loud → self-fixed** |
-| 4 | boosted trees quietly lost ~6 pts on the hard dataset | example trains too slowly with a fixed budget | quiet — **the one failure the wiki itself caused** |
-
-### Did the wiki ever help?
-**Yes — its biggest effects are rescues**: runs *without* the wiki suffered collapses
-and crashes that wiki-equipped runs avoided. Honest caveat: the helps rest on a couple
-of events and fail a strict statistical test (most no-wiki agents avoid those traps on
-their own); the two harms *pass* it.
-
-### Did the updated wiki (0531) fix the problems?
-**It fixed the wrong channel.** The update added warning text to explanation pages
-(which agents skim) and left the harmful boosted-trees **example** untouched — so the
-one real harm persists, unchanged:
-
-```
-boosted trees on the hardest dataset (same agent across all 3 arms)
-
-  no wiki    ████████████████▌  0.330   ← what the agent does on its own
-  old wiki   █████████████▏     0.263   ← example drags it down ~6.6 pts
-  new wiki   █████████████▎     0.267   ← unchanged: the example was never edited
-
-why: the example's settings make the model learn ~4× less before stopping
-  no wiki   amount learned ████████████████████  8.8  → 0.330
-  wiki      amount learned █████                 2.0  → 0.26x
-```
-
-And where the update *did* improve an example, it made the code more complex — and
-agents copied it carelessly. Collapses returned to the no-wiki rate:
-
-```
-runs where the grouped model collapsed
-
-  no wiki    ██░░░░░░░░░   2 of 11  (18%)
-  old wiki   ░░░░░░░░░░░   0 of 18   (0%)
-  new wiki   ██░░░░░░░░░   3 of 17  (18%)  ← WITH the explicit fix in the example
-```
-
-### Why is the wiki built to fail this way?
-It's a good literature summary aimed at the wrong consumer. **~37 of its 45 files are
-explanation; agents act on the 8 examples.** Its feedback log only learns from loud
-errors (the quiet boosted-trees harm never appears in it). And its paper-summarizing
-template records each paper's "recommended setting" as a single number — which agents
-copy as if universal, inheriting the paper's blind spots.
-
-```
-where the wiki's content sits          what drives agent behavior
-  explanations ████████████████████ 37 files     (read, then ignored)
-  examples     ████ 8 files                      ←  copied into the final code
-```
-
----
-
-## The theory this leaves us with
-
-An example's **value = correct × complete × suits-your-data**. Its **danger = whether
-failure is silent.** Four example types, three observed here:
-
-| example type | what agents do | result |
-|---|---|---|
-| correct but **incomplete** | copy the gap | silent failure — *worse than no example* (it crowds out the agent's own debugging) |
-| **wrong** (buggy) | copy the bug | crash → agent self-fixes *(not present in either wiki; must be injected to test)* |
-| correct but **too conservative** | copy | quiet underperformance, visible only on hard data |
-| correct and **adaptive** | copy *sloppily* | best only if copied faithfully — complexity often doesn't survive copying |
-
-**Next experiment (designed, not yet run):** one model type, six versions of its
-example (none / ideal / incomplete / buggy / too-simple / adaptive), ≥3 runs each;
-measure copy fidelity, score, reaction to warnings, citations. The single most
-valuable edit regardless: rewrite the boosted-trees example — the one place the wiki
-still actively misleads.
-
----
-
-## How the experiment is isolated (and how to replicate it)
-
-Every experimental arm lives in this repo under `conditions/`, and **agents never run
-inside the repo**. The operator materializes a *clean-room workspace* containing only
-one arm's contracts + wiki + the task spec:
-
-```
-repo (operator territory)                 agent workspaces (generated)
-├── conditions/wiki-0531/    ──┐
-├── conditions/wiki-0530/    ──┼── make-workspace.sh ──►  ~/bench/ws-<arm>/
-├── conditions/no-wiki/      ──┘                          ├── CLAUDE.md (that arm's contract)
-├── plan_v5.md  evaluator/  operator/                     ├── knowledge-base/ (that arm's wiki, if any)
-├── FINDINGS.md  do_not_read/  paper/                     ├── plan_v5.md, checklist_v5.md
-│   (analysis — never copied to workspaces)               └── CONDITION.txt (arm + repo SHA stamp)
-```
-
-Knowledge separation is **physical, not instructional**: an agent cannot read a wiki
-that does not exist in its world. `CONDITION.txt` records which arm + repo commit each
-run actually used — provenance is a recorded fact, not a folder-name label.
-`operator/check-structure.sh <ws>` verifies a workspace matches its stamp before launch.
-
-Replicate on any machine:
-```bash
-git clone https://github.com/taikunudel/AUTO-INSURANCE.git && cd AUTO-INSURANCE
-./setup.sh && ./setup.sh --start-api && ./smoke.sh        # env + eval API + end-to-end check
-operator/make-workspace.sh wiki-0530                       # any arm: wiki-0531 / wiki-0530 / no-wiki
-operator/check-structure.sh ~/bench/ws-wiki-0530           # must print PASS
-# then launch per RUNBOOK.md with cwd = the workspace
-```
-
----
-
-## Honesty section — what we got wrong along the way
-
-Kept on record deliberately; every claim in this README survived a 4-layer bar
-(outcome · mechanism · significance · counterfactual):
-
-1. "More reading → worse" — **retracted** (the true effect is zero, not negative).
-2. "The wiki clearly helped the grouped model" — **retracted** (fails significance;
-   most no-wiki agents scale on their own).
-3. Our first explanation of the boosted-trees harm ("hit the tree ceiling") was an
-   artifact from the wrong dataset; the verified cause is slow learning stopped early.
-4. One claimed crash cause appears in code but in **zero** captured logs — downgraded
-   from "verified" to "inferred."
-5. Early comparisons silently dropped cells where no-wiki produced nothing at all —
-   hiding that no-wiki had ~2× the total failures.
-
-**Known limits:** most per-arm failure counts are 1–3 events (only the two harms reach
-statistical significance); the boosted-trees learning-rate number rests on one
-surviving log (the recipe itself is verified in three agents' code); the new wiki's
-suspected "scale everything" backfire is a single run; repeat runs and the six-version
-example experiment have not been run yet.
-
----
-
-## Repo map
-
-| path | what |
+| folder | role |
 |---|---|
-| [`FINDINGS.md`](FINDINGS.md) | the full technical analysis |
-| [`OPERATOR.md`](OPERATOR.md) | how to set up and run the benchmark |
-| `conditions/` | the experimental arms: `wiki-0531/`, `wiki-0530/`, `no-wiki/` (each = agent contracts + wiki payload) |
-| `operator/make-workspace.sh` · `check-structure.sh` | materialize a clean-room agent workspace; verify it matches its stamp |
-| `MASTER.md` · `RUNBOOK.md` · `roster.yaml` | operator-agent playbook, per-harness launch commands, model grid |
-| `CLAUDE.md` · `AGENTS.md` · `GEMINI.md` | operator orientation (benchmark contracts live in `conditions/<arm>/`) |
-| `plan_v5.md` · `checklist_v5.md` | the task spec (invariant across all arms) |
-| `evaluator/` | the sealed scoring API |
-| `do_not_read/` | operator-only analysis vault — never materialized into workspaces |
+| `knowledge/` | the data: one topic, stored as a git repo (see "Versioning with git") |
+| `knowledge-mcp/` | the server: one `server.py`, two modes (`read`, `manage`) |
+| `operator/` | post-run support only: the task spec, the scorer, the log/score scripts |
+| `bench/` | where runs execute; kept empty so a new run cannot read an old one |
+
+How they fit together: you launch an agent yourself (with a prompt from `operator/prompts/`),
+the agent reads the knowledge through the `knowledge-mcp` server (pinned to one arm), it does
+its work in a folder under `bench/`, and afterward you score and analyze it with the
+`operator/` scripts. The operator never launches runs.
+
+## Quick start
+
+```bash
+# 1. set up on this machine (checks git + Python >= 3.10, builds the venv)
+knowledge-mcp/setup.sh
+
+# 2. sanity-check the server and its portability
+knowledge-mcp/.venv/bin/python knowledge-mcp/smoke_test.py     # -> ALL CHECKS PASSED
+knowledge-mcp/portability_test.sh                              # -> PASS
+
+# 3. serve one frozen wiki arm to an agent (read-only)
+knowledge-mcp/start.sh --mode read --version v1               # v1 good, v2 silent-defect, v3 stronger-defect
+
+# 4. maintain the wiki (edit a working tree, then commit a new version)
+knowledge-mcp/start.sh --mode manage --version v1
+```
+
+Agents usually connect through one of the `knowledge-mcp/mcp.read.*.json` configs rather than
+launching `start.sh` by hand. External requirements: git, Python >= 3.10 with `mcp`; the scorer
+also needs R, CASdatasets, and Docker.
+
+## Moving or cloning to another machine (important)
+
+Two things do not travel with a copy of the project, so after you move or clone it, run
+`knowledge-mcp/setup.sh` once:
+
+- The Python venv cannot be moved: it has its old path baked in. `setup.sh` rebuilds it.
+- The MCP config files cannot locate themselves. `setup.sh` rewrites the four `mcp.*.json`
+  to point at wherever the project now sits, so they work in any folder, not just
+  `$HOME/knowledge-mcp-design`.
+
+Rule of thumb, for people and for the agent: clone or move it anywhere, run `setup.sh` once,
+then start it.
+
+## The doctor (health check on every start)
+
+`start.sh` runs a dedicated health check, `doctor.sh`, before it launches the server, on every
+start. The doctor checks four things and prints OK / BAD per line:
+
+- git is on PATH (the wiki is a git repo),
+- the Python venv works (`import mcp` succeeds),
+- the knowledge git repo is present with its arms (`v1`/`v2`/`v3`),
+- the four `mcp.*.json` configs are valid JSON.
+
+If anything is BAD, the start aborts with a clear, fixable message (usually: run `setup.sh`), so a
+moved-but-not-set-up copy fails loudly and early instead of misbehaving. The agent connecting to
+the MCP sees the same message on stderr. The server also re-checks git and the repo at startup as
+a second line of defense.
+
+You can run the doctor on its own at any time:
+
+```bash
+knowledge-mcp/doctor.sh        # prints the report, exits 0 if healthy
+```
+
+To skip it on a start (for example, rapid restarts where you know it is healthy), set
+`KMCP_SKIP_DOCTOR=1`.
+
+## Problems the audit found
+
+Grouped by theme. Severity in parentheses.
+
+1. Immutability was broken (high). Manage mode pointed at `current`, which pointed at the
+   frozen `v1`, so every edit wrote into a published arm. There was no working copy.
+2. Paths were fragile (high). The MCP configs used `${HOME}` in a field that is not run
+   through a shell, so the server never launched; prompts and the operator spec carried
+   absolute machine paths (`/home/taikun`, `/Users/theo`). Moving the project breaks them.
+3. The catalog rules fought the code (high). The rulebook said `index.md` lists sub-folders;
+   the builder listed only files and overwrote curated catalogs; three catalog formats coexisted.
+4. The operator task spec was stale (high). `plan_v5.md` and `checklist_v5.md` still
+   described the old on-disk wiki delivery, used date-based names, and rejected the new ones.
+5. The scorer would not start (high). The evaluator Dockerfile installed only `cplm`, but
+   most of the datasets need `CASdatasets`, with no skip path.
+6. Operator correctness (med). Loose completion metric, unguarded file reads, scans the
+   wrong folder, stale strings, broken provenance links, port and bind mismatches.
+
+The full issue list with status is in "Issue tracker" below.
+
+## Versioning with git (the core decision)
+
+We wanted an elegant way to do two things: track every change to a wiki over time, and switch
+which version is served. Git is built for exactly that. Its history is the change log (every
+edit is a commit with a message, a diff, and a timestamp), its branches are the versions (you
+switch with a checkout), and a commit is immutable, so an older version is always recoverable
+by its id. We get change-tracking, version-switching, and a freezing guarantee from one
+well-understood tool, instead of a home-made folder-and-symlink scheme we would have to keep
+correct ourselves.
+
+The home-made scheme (a `versions/` folder per arm, a `current` symlink, a hand-written
+`registry.yaml`, and `kb_snapshot` copying folders) had no immutability guarantee: editing
+landed on a frozen arm. Git removes that whole class of bug.
+
+Decisions:
+- The knowledge is its own git repo, kept alongside this one as `knowledge/`, so the project
+  and the wiki version independently and neither nests inside the other.
+- The three arms are branches: `v1` (good), `v2` (silent-defect), `v3` (stronger-defect).
+  `v2` and `v3` branch from `v1`, so the defect is a visible diff and the shared history is real.
+- Manage mode checks out an arm and edits the working tree. `kb_snapshot` commits. The
+  manager never edits a frozen point, because edits become new commits and a commit is
+  immutable (content-addressed; it cannot change after the fact).
+- Read mode resolves a ref to one commit at startup and serves the file content straight from
+  that commit, never from the working tree. The run is frozen to that commit for the server's
+  whole life, even while the manager keeps committing. Because reads come from the object
+  store, all three arms can be served at once from the same repo.
+
+Why this is stronger than before: immutability is automatic, the timeline and the
+defect-as-a-diff are first class, and pinning a run to a commit is exact and reproducible.
+
+Concurrency note: the repo working tree holds one branch at a time, so one manager edits one
+arm at a time. Editing several arms at once is a later add (git worktrees), not needed now.
+
+## One source of truth for paths
+
+- Code locates itself: `server.py`, `start.sh`, `smoke_test.py` find their own directory and
+  the sibling `knowledge/` repo, so moving the whole tree does not break them.
+- Files that cannot locate themselves (MCP configs, prompts) route through one anchor: a shell
+  that expands `$HOME`, never a full path repeated per file.
+- Rule: no machine-specific absolute path in any code, config, prompt, or doc.
+
+## One server, two modes
+
+- `read`: 5 tools (`kb_index`, `kb_list`, `kb_get`, `kb_grep`, `kb_rules`), pinned to one
+  commit, content served from git, read-only. This is what a benchmark run uses. The write
+  tools are not registered, so a read session cannot even see them.
+- `manage`: all 14 tools. Checks out one arm and edits its working tree; `kb_snapshot` commits.
+
+The rulebook (`AGENT_RULES.md`) ships in two ways: as the server's FastMCP `instructions`
+(handed to every agent on connect) and via `kb_rules()`. The manage tools gate on it: the
+first manage call returns the rulebook and asks the agent to retry, so the rules land in
+context before any edit runs.
+
+## OKF and the catalog
+
+Each commit is an OKF v0.1 bundle: every non-reserved `.md` has YAML frontmatter with a
+non-empty `type`; reserved `index.md`/`log.md` carry no frontmatter; every folder has an
+`index.md` catalog. One catalog format, one link style. The index builder lists sub-folders
+and files, and `kb_validate` checks the whole tree.
+
+## Storage layout
+
+This project and the wiki are TWO git repos. The wiki is its own repo, placed next to the
+server as `knowledge/` (gitignored by this project), with the OKF bundle at its root and the
+arms as branches:
+
+```
+knowledge-mcp-design/          this repo: the server + the operator harness
+  knowledge-mcp/  operator/  bench/  README.md  .gitignore
+  knowledge/                   a SEPARATE git repo, cloned/placed here (gitignored)
+    concepts/ sources/ examples/ entities/ index.md log.md overview.md
+    .git/                      branches: v1 (good), v2 (silent-defect), v3 (stronger-defect)
+```
+
+The server finds `knowledge/` as its sibling by default, or you point it anywhere with
+`--registry <path>`.
+
+Tool to git mapping:
+
+| tool | git |
+|---|---|
+| `kb_versions` | `git branch` + `git log` (arms and timeline) |
+| `kb_snapshot(message)` | `git add -A && git commit` (a new immutable point) |
+| `kb_set_current(ref)` | `git checkout ref` (switch the working/default arm) |
+| read of version `vN` | resolve `vN` to a commit at startup, serve content from that commit |
+
+## Issue tracker
+
+From a full per-file audit (2026-06-21). Done items are fixed and, where code, tested.
+
+Done:
+- Immutability: manage edits a working tree, never a published commit (git). Tested.
+- The MCP configs launch through a shell so `$HOME` expands (they never started before).
+- Catalog builder lists sub-folders and preserves curated descriptions; `kb_validate` also
+  checks `log.md`; the rule-7 example is relative; `kb_versions` reads git (no stale string).
+- Evaluator: Dockerfile installs CASdatasets + arrow (with skip-on-failure loading); binds
+  localhost by default; one canonical port (8765); the datasets README calls the files manifests.
+- Operator scripts: `backfill` guards missing files and scans `bench/`; `collect-results` uses
+  the strict metric (`n_completed == 10`).
+- Prompts and template use a `{RUN_INDEX}` slot and portable `~` paths.
+- The operator spec (`plan_v5.md`, `checklist_v5.md`) now describes MCP delivery, version
+  naming (`wikiv1/v2/v3`), the real harness set, and the MCP access log as the consultation
+  trail; no machine paths.
+- Source pages are self-contained: the dangling raw-papers provenance pointer was dropped on
+  all three arms.
+- Portability: `setup.sh`, a startup git check, and `portability_test.sh`.
+
+Open:
+- swautoins: `Claims` is used as a predictor of `Payment` (target leakage). This is a
+  benchmark-definition decision (see "The scorer keeps the answers sealed"), left for the owner.
+- The 23 "low" audit items are not yet pulled.
+
+## Robustness and portability
+
+The system must run on any machine, not just where it was built. Three guards:
+- Code self-locates. `server.py`, `start.sh`, `smoke_test.py` find their own directory and the
+  sibling `knowledge/` repo, so moving the whole tree does not break them. Files that cannot
+  self-locate (the MCP configs) launch through `/bin/sh -c` so `$HOME` expands.
+- One setup step per machine. `setup.sh` checks for git and Python >= 3.10 and builds the venv
+  (a venv cannot be copied between machines). The server also checks at startup that git is
+  present, and fails loudly if not.
+- A portability test. `portability_test.sh` copies the project to a temporary path and runs the
+  smoke test there, so any re-introduced absolute path is caught immediately.
+
+External requirements: git (the wiki is a git repo) and Python >= 3.10 with the `mcp` package.
+The scorer additionally needs R, the CASdatasets package, and Docker.
+
+## The scorer keeps the answers sealed
+
+The evaluator (`operator/evaluator/app.R`) never hands an agent the true target. It carves out a
+single global test set once and serves it WITHOUT the response column; the labels stay
+server-side, and scoring is admin-only (Bearer token). An agent can only submit predictions and
+get back a score, it cannot read the answers.
+
+One open data issue lives in the dataset configs, not the API: `swautoins.yaml` lists `Claims`
+(the number of claims) as a predictor of `Payment` (the total claim cost). Claims is part of the
+same outcome, so this is target leakage and would inflate that dataset's score. Removing `Claims`
+changes the benchmark definition, so it is left as a decision rather than a silent edit.

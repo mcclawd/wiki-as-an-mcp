@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "knowledge": {
+      "command": "/bin/sh",
+      "args": ["-c", "exec \"$HOME/knowledge-mcp-design/knowledge-mcp/start.sh\" --mode read --version v3"]
+    }
+  }
+}

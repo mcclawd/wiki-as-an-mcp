@@ -1,41 +1,14 @@
-# ===== run artifacts (never tracked) =====
-run-*/
-failed-runs/
-v4-runs/
-_failed-*/
-_superseded-*/
-.current_run_dir
-audit/
-*.log
+# The wiki is its own git repo, versioned separately. This project does not track it.
+/knowledge/
 
-# ===== heavy / out-of-scope =====
-paper/
+# Local Python environment (rebuilt per machine by knowledge-mcp/setup.sh).
+knowledge-mcp/.venv/
 
-# ===== local wiki archive (the vendored copy lives in knowledge-base/) =====
-llm-wiki-agent/
-
-# ===== run-specific scratch (not reusable) =====
-read_wiki.py
-end_task.py
-wait_script.sh
-
-# ===== secrets / runtime — never publish =====
-evaluator/secrets/
-evaluator/logs/
-secrets/
-**/secrets.rds
-*.rds
-
-# ===== local config / OS cruft =====
-.env
-.claude/settings.local.json
-.DS_Store
-**/.DS_Store
-*.bundle
-__pycache__/
+# Generated / transient.
 **/__pycache__/
+*.pyc
+knowledge-mcp/logs/
 
-# ===== clean-room: knowledge-base is materialized into agent workspaces, never at repo root =====
-# (anchored to root — conditions/*/knowledge-base/ IS tracked)
-/knowledge-base/
-/CONDITION.txt
+# Runs execute under bench/; keep the folder, ignore the runs.
+/bench/*
+!/bench/README.md
