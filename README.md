@@ -6,18 +6,12 @@ Overall Design
 To our best knowledge, this is the first general purpose MCP for building and using your own personal wiki (knowledge base), following the Google proposed Open Knowledge Format and Andrew Karpahyt's LLM wiki design philosophy. This MCP is task-agnostic.
 
 [Open Knowledge Format](https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing)
+
 [Andrew Karpahyt's LLM wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
 
-
-Serve a git-versioned knowledge base (an OKF wiki: a folder of markdown with YAML
-frontmatter) to LLM agents over the Model Context Protocol (MCP). One small server, two
-modes: **read** (an agent consults one frozen version) and **manage** (a curator edits and
-snapshots new versions). The wiki is a normal git repo, so versions are commits and branches,
-and editing never destroys a published version.
-
-This `main` branch is the **general-purpose server**. For a real project built on it, see the
-**`auto-insurance` branch**, an LLM-agent benchmark that serves a Tweedie/GLM insurance-modeling
-wiki across a good arm and silent-defect arms.
+1. Git enabled the MCP to manage more than one versions of WIKI.
+2. 2 modes (user, manager) allows the WIKI stay aways from unintentional contamination.
+3. Regular health check ensures the correctness of the wiki index.
 
 ## Why
 
