@@ -1,5 +1,8 @@
 # wiki-as-an-mcp
 
+<img width="1918" height="1482" alt="image" src="https://github.com/user-attachments/assets/cf9e6f64-3bfa-4219-a2d0-fc98ce9db0e8" />
+Overall Design
+
 Serve a git-versioned knowledge base (an OKF wiki: a folder of markdown with YAML
 frontmatter) to LLM agents over the Model Context Protocol (MCP). One small server, two
 modes: **read** (an agent consults one frozen version) and **manage** (a curator edits and
