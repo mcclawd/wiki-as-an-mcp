@@ -3,6 +3,12 @@
 <img width="1918" height="1482" alt="image" src="https://github.com/user-attachments/assets/cf9e6f64-3bfa-4219-a2d0-fc98ce9db0e8" />
 Overall Design
 
+To our best knowledge, this is the first general purpose MCP for building and using your own personal wiki (knowledge base), following the Google proposed Open Knowledge Format and Andrew Karpahyt's LLM wiki design philosophy. This MCP is task-agnostic.
+
+[Open Knowledge Format](https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing)
+[Andrew Karpahyt's LLM wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
+
+
 Serve a git-versioned knowledge base (an OKF wiki: a folder of markdown with YAML
 frontmatter) to LLM agents over the Model Context Protocol (MCP). One small server, two
 modes: **read** (an agent consults one frozen version) and **manage** (a curator edits and
