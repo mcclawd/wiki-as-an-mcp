@@ -48,8 +48,10 @@ node, without exception, obeys these four invariants:
 3. **It MAY contain subfolders.** Each subfolder is itself a node and **MUST obey all of
    these same invariants** (its own `index.md`, its own knowledge documents, its own
    subfolders). The rule is recursive: it applies at every depth, all the way down.
-4. **Reserved filenames are `index.md` and `log.md`.** They are never knowledge documents
-   and never carry frontmatter. `log.md` (optional) records this node's change history.
+4. **Reserved filenames are `index.md`, `log.md`, and `README.md`.** They are never knowledge
+   documents and never carry frontmatter. `log.md` (optional) records this node's change
+   history; `README.md` (optional, root only by convention) is the bundle's human-facing
+   landing page (e.g. on GitHub).
 
 Said plainly: pick any folder in the KB, at any depth, and it looks the same. One
 `index.md`, zero or more knowledge `.md` files, zero or more subfolders that each look the

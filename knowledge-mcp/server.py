@@ -38,6 +38,10 @@ from mcp.server.fastmcp import FastMCP
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build_okf import (split_frontmatter, fm_keys, gen_index,
                        title_from, RESERVED)  # noqa: E402
+try:                                  # optional view layer: a graph.html regenerated on each edit
+    from graph import write_graph as _write_graph  # noqa: E402
+except Exception:                     # a broken/absent view must never stop the server
+    _write_graph = None
 
 # --- args ----------------------------------------------------------------------------
 ap = argparse.ArgumentParser(description="knowledge-mcp server (stdio).")
@@ -297,6 +301,16 @@ if ARGS.mode == "manage":
         with (ACTIVE_ROOT / "log.md").open("a", encoding="utf-8") as fh:
             fh.write(f"- {_now()} {msg}\n")
 
+    def _regen_graph():
+        """Regenerate <root>/graph.html so the visual view tracks every edit. Never raises:
+        a view bug must not break a knowledge write (mirrors how _log swallows errors)."""
+        if _write_graph is None:
+            return
+        try:
+            _write_graph(ACTIVE_ROOT)
+        except Exception:
+            pass
+
     def _bundle_dirs():
         return [ACTIVE_ROOT] + [d for d in ACTIVE_ROOT.rglob("*")
                                 if d.is_dir() and ".git" not in d.relative_to(ACTIVE_ROOT).parts]
@@ -357,6 +371,7 @@ if ARGS.mode == "manage":
         gen_index(p.parent)
         _append_log(f"add {page_id}")
         _log("kb_add", page_id=page_id)
+        _regen_graph()
         return (f"added {page_id} (working tree, uncommitted)\n"
                 f"  frontmatter: type={type.strip()}, title=\"{ttl}\", status=draft, version=1, created={ts}\n"
                 f"  parent index rebuilt: {Path(page_id).parent}/index.md\n"
@@ -399,6 +414,7 @@ if ARGS.mode == "manage":
                      encoding="utf-8")
         _append_log(f"update {page_id}" + (f" ({note})" if note else ""))
         _log("kb_update", page_id=page_id)
+        _regen_graph()
         return (f"updated {page_id}\n  version -> {ver}\n  updated: {_now()}\n  log appended") + RULES_REMINDER
 
     @mcp.tool()
@@ -419,6 +435,7 @@ if ARGS.mode == "manage":
         gen_index(p.parent)
         _append_log(f"remove {page_id}")
         _log("kb_remove", page_id=page_id)
+        _regen_graph()
         return (f"removed {page_id}\n  parent index rebuilt: {Path(page_id).parent}/index.md\n  log appended") + RULES_REMINDER
 
     @mcp.tool()
@@ -437,6 +454,7 @@ if ARGS.mode == "manage":
                            else f"# {d.name.replace('-', ' ').title()}\n", encoding="utf-8")
         gen_index(d.parent)
         _log("kb_new_folder", path=path)
+        _regen_graph()
         return (f"created {path}/\n  wrote {path}/index.md\n  parent index updated") + RULES_REMINDER
 
     @mcp.tool()
@@ -448,6 +466,7 @@ if ARGS.mode == "manage":
         d = (ACTIVE_ROOT / folder.strip().strip("/")) if folder else ACTIVE_ROOT
         n = gen_index(d) or 0
         _log("kb_reindex", folder=folder, entries=n)
+        _regen_graph()
         return (f"rebuilt {folder or '.'}/index.md ({n} entries)") + RULES_REMINDER
 
     @mcp.tool()
@@ -492,6 +511,7 @@ if ARGS.mode == "manage":
             return g
         if not message.strip():
             return "ERROR: a snapshot needs a message describing the change."
+        _regen_graph()                # ensure the committed snapshot carries a current graph.html
         _git("add", "-A")
         c = _git("commit", "-m", message.strip())
         if "nothing to commit" in (c.stdout + c.stderr):
@@ -519,6 +539,7 @@ if ARGS.mode == "manage":
             return (f"ERROR: cannot switch to '{ref}' (uncommitted changes? snapshot or discard first). "
                     f"git said: {co.stderr.strip()}")
         _log("kb_set_current", old=old, new=ref)
+        _regen_graph()                # the working tree now points at a different arm; refresh the view
         return (f"current arm: {old} -> {ref} (checked out)\n"
                 f"  read servers started now default to {ref}\n"
                 f"  already-running read servers keep their pinned commit") + RULES_REMINDER
