@@ -1,5 +1,11 @@
 # wiki-as-an-mcp
 
+![Last Commit](https://img.shields.io/github/last-commit/taikunudel/wiki-as-an-mcp)
+![Commit Activity](https://img.shields.io/github/commit-activity/m/taikunudel/wiki-as-an-mcp)
+![Maintained](https://img.shields.io/badge/Maintained%3F-yes-green.svg)
+![Issues](https://img.shields.io/github/issues/taikunudel/wiki-as-an-mcp)
+![License](https://img.shields.io/github/license/taikunudel/wiki-as-an-mcp)
+
 **English** | [中文](#中文版)
 
 <img width="1918" height="1482" alt="image" src="https://github.com/user-attachments/assets/cf9e6f64-3bfa-4219-a2d0-fc98ce9db0e8" />
