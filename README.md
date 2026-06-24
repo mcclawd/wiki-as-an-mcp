@@ -32,6 +32,24 @@ the MCP `instructions` and via a `kb_rules()` tool, and the write tools enforce 
 - **Portable.** It self-locates, ships a setup script, a health `doctor` that runs on every
 start, and a portability test.
 
+## Example knowledge base
+
+[![knowledge-iosapp graph](https://raw.githubusercontent.com/taikunudel/knowledge-iosapp/v1/graph-preview.png)](https://taikunudel.github.io/knowledge-iosapp/)
+
+**[knowledge-iosapp](https://github.com/taikunudel/knowledge-iosapp)** is a real OKF knowledge
+base served and maintained by this server — the development wiki for an iOS app.
+**[Open the live, interactive graph »](https://taikunudel.github.io/knowledge-iosapp/)** — the
+`graph.html` it ships is regenerated on every manage-mode edit, so the live view always reflects
+the current state of the base.
+
+Serve that example against this server yourself:
+
+```bash
+git clone https://github.com/taikunudel/wiki-as-an-mcp
+git clone https://github.com/taikunudel/knowledge-iosapp wiki-as-an-mcp/knowledge
+cd wiki-as-an-mcp/knowledge-mcp && ./setup.sh && ./start.sh --mode read --version v1
+```
+
 ## Quick start
 
 ```bash
@@ -128,6 +146,20 @@ logs. It is a worked example of "a knowledge base as an MCP" inside a real exper
 - **安全编辑（Safe edits）。** 管理模式（Manage mode）编辑一个工作树（working tree）；`kb_snapshot` 提交一个新版本。更早的提交永远不会改变，因此已发布的版本不会被一次编辑破坏。
 - **规则随数据同行（Rules travel with the data）。** 规则手册（rulebook，即 `AGENT_RULES.md`）作为 MCP 的 `instructions` 内置于服务器中，并通过一个 `kb_rules()` 工具提供，写入工具会强制执行这些规则。
 - **可移植（Portable）。** 它能自我定位，附带一个安装脚本（setup script）、一个在每次启动时运行的健康检查器 `doctor`，以及一个可移植性测试（portability test）。
+
+## 示例知识库（Example knowledge base）
+
+[![knowledge-iosapp 图谱](https://raw.githubusercontent.com/taikunudel/knowledge-iosapp/v1/graph-preview.png)](https://taikunudel.github.io/knowledge-iosapp/)
+
+**[knowledge-iosapp](https://github.com/taikunudel/knowledge-iosapp)** 是由本服务器提供并维护的一个真实 OKF 知识库 —— 某 iOS 应用的开发维基。**[打开在线交互式图谱 »](https://taikunudel.github.io/knowledge-iosapp/)** —— 它附带的 `graph.html` 会在每次管理模式（manage-mode）编辑后重新生成，因此在线视图始终反映知识库的当前状态。
+
+用本服务器亲自运行该示例：
+
+```bash
+git clone https://github.com/taikunudel/wiki-as-an-mcp
+git clone https://github.com/taikunudel/knowledge-iosapp wiki-as-an-mcp/knowledge
+cd wiki-as-an-mcp/knowledge-mcp && ./setup.sh && ./start.sh --mode read --version v1
+```
 
 ## 快速开始（Quick start）
 
