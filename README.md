@@ -4,7 +4,7 @@
 ![Commit Activity](https://img.shields.io/github/commit-activity/m/taikunudel/wiki-as-an-mcp)
 ![Maintained](https://img.shields.io/badge/Maintained%3F-yes-green.svg)
 ![Issues](https://img.shields.io/github/issues/taikunudel/wiki-as-an-mcp)
-![License](https://img.shields.io/github/license/taikunudel/wiki-as-an-mcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/taikunudel/wiki-as-an-mcp/blob/main/LICENSE)
 
 **English** | [中文](#中文版)
 
