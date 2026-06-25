@@ -93,6 +93,51 @@ and neither nests inside the other. Its root is an OKF v0.1 bundle:
 
 Place it next to the server as `knowledge/`, or pass `--registry /path/to/your/knowledge`.
 
+## Topics: one server, many bases  (update 06262026)
+
+Before this update a server served exactly one base, pinned at launch; a second base meant a
+second process:
+
+```
+BEFORE 06262026 · one server = one topic, pinned at launch
+
+   agent ──kb_*──▶ server ──▶ one repo @ one commit
+                              5 read tools · the whole base in scope
+
+   a second topic  ⇒  a second server process
+```
+
+This update lets one server hold a **registry of topic repos** and choose between them at the
+first read, so the irrelevant ones never reach the agent:
+
+```
+AFTER 06262026 · one server, many topics, chosen at the first read
+
+   registry/
+    ├ insurance/ (repo) ┐
+    ├ nutrition/ (repo) ├─ discovered  (live, unless --dynamic off)
+    └ swiftui/   (repo) ┘
+         │
+   agent ─1st kb_*─▶ GATE ─▶ catalog via kb_topics (name + one-line description)
+         ◀────────────────── "select a topic before reading"
+         ─ kb_select_topic(insurance) ─▶ active = insurance
+         ─ kb_* ─▶ served from insurance @ its commit ONLY;
+                   other topics never enter the agent's context
+
+   --topic <t> at launch ⇒ gate skipped = the BEFORE behavior (reproducible)
+```
+
+Concretely:
+
+- `kb_topics` and `kb_select_topic` appear **only** for a multi-topic registry with no pin; a
+  flat repo or a pinned `--topic` keeps the original 5-read / 14-manage surface.
+- `--select auto|manual` — at the gate, `auto` (default) lets the agent match the task to the
+  catalog, `manual` makes it ask you first.
+- `--dynamic on|off` — `on` (default) re-scans for new topics each call; `off` freezes the
+  list at startup for reproducible runs.
+- Isolation is **soft**: a wrong pick or a switch is recoverable, but content already read
+  stays in context for the session, so keep the topic count small (see below).
+
 ## Recommended limits
 
 If you have one server manage multiple knowledge bases (topics), keep the number small. As a
@@ -205,6 +250,47 @@ cd wiki-as-an-mcp/knowledge-mcp
 - 各个版次/版本（editions/versions）是 git 分支和提交（一个项目可以将多个分支（arms）保留为分支）。
 
 将它放在服务器旁边作为 `knowledge/`，或传入 `--registry /path/to/your/knowledge`。
+
+## 主题：一个服务器，多个知识库（更新 06262026）
+
+在本次更新之前，一个服务器只服务一个知识库，并在启动时固定；要再服务一个就得再开一个进程：
+
+```
+BEFORE 06262026 · one server = one topic, pinned at launch
+
+   agent ──kb_*──▶ server ──▶ one repo @ one commit
+                              5 read tools · the whole base in scope
+
+   a second topic  ⇒  a second server process
+```
+
+本次更新让一个服务器可以持有一个**主题仓库的注册表（registry of topic repos）**，并在第一次读取时在它们
+之间选择，因此无关的主题永远不会进入代理（agent）的上下文：
+
+```
+AFTER 06262026 · one server, many topics, chosen at the first read
+
+   registry/
+    ├ insurance/ (repo) ┐
+    ├ nutrition/ (repo) ├─ discovered  (live, unless --dynamic off)
+    └ swiftui/   (repo) ┘
+         │
+   agent ─1st kb_*─▶ GATE ─▶ catalog via kb_topics (name + one-line description)
+         ◀────────────────── "select a topic before reading"
+         ─ kb_select_topic(insurance) ─▶ active = insurance
+         ─ kb_* ─▶ served from insurance @ its commit ONLY;
+                   other topics never enter the agent's context
+
+   --topic <t> at launch ⇒ gate skipped = the BEFORE behavior (reproducible)
+```
+
+具体而言：
+
+- 只有当注册表含有多个主题且未用 `--topic` 固定时，才会出现 `kb_topics` 和 `kb_select_topic`；扁平单仓库
+  或固定了 `--topic` 时，仍保持原来的 5 个读取 / 14 个管理工具。
+- `--select auto|manual` —— 在选择关口处，`auto`（默认）让代理根据任务匹配目录，`manual` 让它先问你。
+- `--dynamic on|off` —— `on`（默认）每次调用都重新扫描以发现新主题；`off` 在启动时冻结列表，用于可复现的运行。
+- 隔离是**软性的**：选错或切换都可恢复，但已读入的内容会在本次会话中保留在上下文里，因此请让主题数量保持较少（见下文）。
 
 ## 推荐上限（Recommended limits）
 
