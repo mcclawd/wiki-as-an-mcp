@@ -93,6 +93,16 @@ and neither nests inside the other. Its root is an OKF v0.1 bundle:
 
 Place it next to the server as `knowledge/`, or pass `--registry /path/to/your/knowledge`.
 
+## Recommended limits
+
+If you have one server manage multiple knowledge bases (topics), keep the number small. As a
+soft default, aim for a handful rather than dozens; there is no hard cap.
+
+We have not measured whether managing many bases affects anything (selection accuracy, context
+size, health-check time) or has no effect at all. Until there is data, a small number is the
+cautious default, not a proven limit. If you need more, run several servers grouped by related
+bases instead of loading everything into one.
+
 ## Git versioning
 
 A version is a git commit; an edition is a branch. Read resolves a ref to one commit at
@@ -195,6 +205,12 @@ cd wiki-as-an-mcp/knowledge-mcp
 - 各个版次/版本（editions/versions）是 git 分支和提交（一个项目可以将多个分支（arms）保留为分支）。
 
 将它放在服务器旁边作为 `knowledge/`，或传入 `--registry /path/to/your/knowledge`。
+
+## 推荐上限（Recommended limits）
+
+如果让单个服务器管理多个知识库（knowledge base，即主题 topic），请让数量保持较少。作为软性默认值，建议保持在个位数，而不是几十个；没有硬性上限。
+
+我们尚未测量管理大量知识库是否会带来任何影响（选择准确性、上下文大小、健康检查耗时），或者根本没有影响。在有数据之前，较少的数量是谨慎的默认选择，而非已证实的限制。如果你需要更多，请按相关主题分组运行多个服务器，而不是把所有内容都塞进一个。
 
 ## Git 版本管理（Git versioning）
 
