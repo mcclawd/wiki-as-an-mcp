@@ -53,8 +53,8 @@ const t = (name, fn) => ({ name, fn });
 
     t('T2 click on empty area INSIDE the card keeps it open', async () => {
       if (!(await drawerOpen())) await openNode();
-      const r = await page.$eval('#kg-d-body', el => el.getBoundingClientRect().toJSON());
-      await page.mouse.click(r.x + r.width * 0.5, r.y + 9); // top padding strip: no links there
+      const r = await page.$eval('#kg-d-scroll', el => el.getBoundingClientRect().toJSON());
+      await page.mouse.click(r.x + r.width * 0.5, r.y + 10); // top padding strip: no links there
       await page.waitForTimeout(450);
       if (!(await drawerOpen())) throw new Error('card closed on an in-card click');
     }),
@@ -62,7 +62,7 @@ const t = (name, fn) => ({ name, fn });
     t('T3 text-selection drag inside the card keeps it open + does not pan graph', async () => {
       if (!(await drawerOpen())) await openNode();
       const [tx0, ty0] = [await kg('k.tx'), await kg('k.ty')];
-      const r = await page.$eval('#kg-d-body', el => el.getBoundingClientRect().toJSON());
+      const r = await page.$eval('#kg-d-scroll', el => el.getBoundingClientRect().toJSON());
       await page.mouse.move(r.x + 60, r.y + 60);
       await page.mouse.down();
       await page.mouse.move(r.x + 260, r.y + 64, { steps: 8 });
@@ -77,11 +77,11 @@ const t = (name, fn) => ({ name, fn });
       if (!(await drawerOpen())) await openNode();
       await openNode('(n.markdown||"").length > 1500'); // long page so the body can scroll
       const scale0 = await kg('k.scale');
-      const r = await page.$eval('#kg-d-body', el => el.getBoundingClientRect().toJSON());
+      const r = await page.$eval('#kg-d-scroll', el => el.getBoundingClientRect().toJSON());
       await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
       await page.mouse.wheel(0, 400);
       await page.waitForTimeout(250);
-      const scrolled = await page.$eval('#kg-d-body', el => el.scrollTop);
+      const scrolled = await page.$eval('#kg-d-scroll', el => el.scrollTop);
       if (scrolled === 0) throw new Error('card body did not scroll on wheel');
       if (await kg('k.scale') !== scale0) throw new Error('graph zoomed while wheeling over the card');
     }),
@@ -138,7 +138,7 @@ const t = (name, fn) => ({ name, fn });
       const after = await kg('k.selected');
       if (after === before || after === null) throw new Error('wikilink click did not switch pages');
       if (!(await drawerOpen())) throw new Error('card not open after wikilink nav');
-      if (await page.$eval('#kg-d-body', el => el.scrollTop) !== 0) throw new Error('scroll not reset after nav');
+      if (await page.$eval('#kg-d-scroll', el => el.scrollTop) !== 0) throw new Error('scroll not reset after nav');
     }),
 
     t('T9 related chip navigates', async () => {
@@ -201,49 +201,23 @@ const t = (name, fn) => ({ name, fn });
       if (bg0 === bg1) throw new Error('card background did not change with theme');
     }),
 
-    t('T16 frontmatter chevron collapses and expands (incl. Raw tab interplay)', async () => {
-      await openNode('(n.meta && n.meta.description)');
-      const vis = sel => page.$eval(sel, el => getComputedStyle(el).display !== 'none');
-      if (!(await vis('#kg-d-meta-clean'))) throw new Error('Details not visible by default');
-      await page.click('#kg-meta-toggle');
-      if (await vis('#kg-d-meta-clean')) throw new Error('Details still visible after collapse');
-      if (await vis('#kg-d-meta-raw')) throw new Error('Raw visible after collapse');
-      if (await vis('#kg-meta-tabs')) throw new Error('tabs still visible after collapse');
-      if ((await page.$eval('#kg-meta-toggle', el => el.textContent)) !== '▸') throw new Error('chevron not rotated');
-      await page.click('#kg-meta-toggle');
-      if (!(await vis('#kg-d-meta-clean'))) throw new Error('Details not restored after expand');
-      await page.click('#kg-meta-tabs .kg-gb[data-m="raw"]');
-      if (!(await vis('#kg-d-meta-raw'))) throw new Error('Raw tab broken after collapse cycle');
-      await page.click('#kg-meta-tabs .kg-gb[data-m="clean"]');
-    }),
-
-    t('T17 collapse state survives switching pages', async () => {
-      await openNode();
-      await page.click('#kg-meta-toggle'); // collapse
-      await openNode('n.id !== k.selected');
-      const shown = await page.$eval('#kg-d-meta-clean', el => getComputedStyle(el).display !== 'none');
-      if (shown) throw new Error('frontmatter re-expanded after switching pages');
-      await page.click('#kg-meta-toggle'); // restore
-    }),
-
-    t('T18 collapse state survives a reload (localStorage)', async () => {
-      await openNode();
-      await page.click('#kg-meta-toggle'); // collapse
-      await page.reload();
-      await page.waitForSelector('.kg-node');
-      await page.waitForTimeout(1200);
-      await openNode();
-      const shown = await page.$eval('#kg-d-meta-clean', el => getComputedStyle(el).display !== 'none');
-      if (shown) throw new Error('collapse not persisted across reload');
-      await page.click('#kg-meta-toggle'); // leave expanded
-      await page.evaluate(() => localStorage.removeItem('kg-meta-collapsed'));
-    }),
-
-    t('T15 card header respects its 42vh cap', async () => {
-      await openNode('(n.tags||[]).length > 5 || (n.markdown||"").length > 2000');
-      const h = await page.$eval('#kg-drawer > div:first-child', el => el.getBoundingClientRect().height);
-      const vh = await page.evaluate(() => innerHeight);
-      if (h > 0.42 * vh + 2) throw new Error(`header ${h}px exceeds 42vh=${0.42 * vh}px`);
+    t('T15 one scroll surface: title/frontmatter scroll away, X stays and closes', async () => {
+      await openNode('n === k.nodes.reduce((a, b) => (a.markdown || "").length > (b.markdown || "").length ? a : b)');
+      const top0 = await page.$eval('#kg-d-title', el => el.getBoundingClientRect().top);
+      const moved = await page.evaluate(() => { const sc = document.getElementById('kg-d-scroll'); sc.scrollTop = 99999; return sc.scrollTop; });
+      if (moved < 120) throw new Error('longest page leaves only ' + moved + 'px of scroll; cannot exercise the test');
+      await page.waitForTimeout(200);
+      const top1 = await page.$eval('#kg-d-title', el => el.getBoundingClientRect().top);
+      if (!(top1 <= top0 - moved + 30)) throw new Error('title did not scroll with the content (still a split header)');
+      const xOnTop = await page.evaluate(() => {
+        const b = document.getElementById('kg-d-close').getBoundingClientRect();
+        const el = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2);
+        return !!(el && el.closest('#kg-d-close'));
+      });
+      if (!xOnTop) throw new Error('X not clickable after scrolling');
+      await page.click('#kg-d-close');
+      await page.waitForTimeout(450);
+      if (await drawerOpen()) throw new Error('X did not close the scrolled card');
     }),
   ];
 

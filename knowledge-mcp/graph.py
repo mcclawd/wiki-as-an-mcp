@@ -385,9 +385,8 @@ _TEMPLATE = r"""<!DOCTYPE html>
   :root[data-theme="dark"] .kg-item:hover { background: rgba(255,255,255,0.06); }
   :root[data-theme="dark"] .kg-item.sel { background: #2d333f; color: #f1eff4; }
   :root[data-theme="dark"] #kg-drawer { background: #1a1d25 !important; border-color: #2c313c !important; box-shadow: -20px 0 50px rgba(0,0,0,0.5) !important; }
-  :root[data-theme="dark"] #kg-drawer > div:first-child { border-bottom-color: #262b35 !important; }
   :root[data-theme="dark"] #kg-d-type { color: #8e8c96 !important; }
-  :root[data-theme="dark"] #kg-d-close, :root[data-theme="dark"] #kg-meta-toggle { background: #2a2f3a !important; color: #b8b6c0 !important; border-color: #3a4150 !important; }
+  :root[data-theme="dark"] #kg-d-close { background: #2a2f3a !important; color: #b8b6c0 !important; border-color: #3a4150 !important; }
   :root[data-theme="dark"] #kg-d-title { color: #f1eff4 !important; }
   :root[data-theme="dark"] #kg-d-path { color: #87858f !important; }
   :root[data-theme="dark"] #kg-d-body { color: #c4c2cc !important; }
@@ -475,22 +474,18 @@ _TEMPLATE = r"""<!DOCTYPE html>
 </div>
 
 <aside id="kg-drawer" style="position: fixed; inset: 26px 26px 26px 338px; z-index: 30; transform: translateX(112%); transition: transform .4s cubic-bezier(.4,0,.2,1); display: flex; flex-direction: column; background: #fff; border: 1px solid #e7e2d6; border-radius: 18px; box-shadow: -20px 0 50px rgba(60,48,28,0.14);">
-  <div style="padding: 24px 24px 16px; padding-left: max(24px, calc((100% - 760px) / 2)); padding-right: max(24px, calc((100% - 760px) / 2)); border-bottom: 1px solid #ece7dc; flex: none; max-height: 42vh; overflow-y: auto;">
-    <div class="kg-row" style="align-items: flex-start; gap: 14px;">
-      <div id="kg-d-type" style="display: inline-flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 700; letter-spacing: .8px; color: #8a8992;"></div>
-      <button id="kg-d-close" aria-label="Close" style="background: #f3efe6; color: #6c6b73; border: 1px solid #e7e2d6; width: 30px; height: 30px; border-radius: 50%; font-size: 18px; line-height: 1; cursor: pointer; flex: none;">×</button>
-    </div>
+  <button id="kg-d-close" aria-label="Close" style="position: absolute; top: 18px; right: 18px; z-index: 2; background: #f3efe6; color: #6c6b73; border: 1px solid #e7e2d6; width: 30px; height: 30px; border-radius: 50%; font-size: 18px; line-height: 1; cursor: pointer;">×</button>
+  <div id="kg-d-scroll" style="flex: 1; min-height: 0; overflow: auto;">
+  <div style="padding: 24px 24px 0; padding-left: max(24px, calc((100% - 760px) / 2)); padding-right: max(24px, calc((100% - 760px) / 2));">
+    <div id="kg-d-type" style="display: inline-flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 700; letter-spacing: .8px; color: #8a8992;"></div>
     <h2 id="kg-d-title" style="margin: 11px 0 0; font-family: var(--serif); font-size: 21px; font-weight: 700; line-height: 1.26; color: #1c1c22; text-wrap: pretty;"></h2>
     <div id="kg-d-path" style="margin-top: 8px; font-size: 11px; color: #a09e9a; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all;"></div>
     <div id="kg-d-meta" style="margin-top: 16px;">
       <div class="kg-row" style="margin-bottom: 9px;">
         <div class="kg-cap">Frontmatter</div>
-        <div style="display: inline-flex; align-items: center; gap: 6px;">
-          <div id="kg-meta-tabs" class="kg-meta-tabs">
-            <button class="kg-gb" data-m="clean">Details</button>
-            <button class="kg-gb" data-m="raw">Raw</button>
-          </div>
-          <button id="kg-meta-toggle" aria-label="Collapse frontmatter" aria-expanded="true" style="width: 22px; height: 22px; border-radius: 7px; background: rgba(243,239,230,0.65); border: 1px solid #e7e2d6; color: #8a6a3f; cursor: pointer; font-size: 11px; line-height: 1; display: inline-flex; align-items: center; justify-content: center;">▾</button>
+        <div id="kg-meta-tabs" class="kg-meta-tabs">
+          <button class="kg-gb" data-m="clean">Details</button>
+          <button class="kg-gb" data-m="raw">Raw</button>
         </div>
       </div>
       <div id="kg-d-meta-clean"></div>
@@ -498,7 +493,8 @@ _TEMPLATE = r"""<!DOCTYPE html>
     </div>
     <div id="kg-d-related" style="display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px;"></div>
   </div>
-  <div id="kg-d-body" style="flex: 1; min-height: 0; overflow: auto; padding: 18px 24px 30px; padding-left: max(24px, calc((100% - 760px) / 2)); padding-right: max(24px, calc((100% - 760px) / 2)); font-size: 13px; line-height: 1.72; color: #3c3c44;"></div>
+  <div id="kg-d-body" style="padding: 18px 24px 30px; padding-left: max(24px, calc((100% - 760px) / 2)); padding-right: max(24px, calc((100% - 760px) / 2)); font-size: 13px; line-height: 1.72; color: #3c3c44;"></div>
+  </div>
 </aside>
 
 <script>window.GRAPH_DATA = @@PAYLOAD@@;</script>
@@ -753,20 +749,13 @@ class KG {
     this.renderMeta(n);
     const rel = [...this.adj[id]].map(i => this.byId[i]).sort((a, b) => b.deg - a.deg).slice(0, 12);
     this.$('kg-d-related').innerHTML = rel.map(r => `<span class="kg-chip" data-id="${r.id}" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:#f5f1e8;border:1px solid #e7e2d6;font-size:11.5px;color:#45454d"><span style="width:7px;height:7px;border-radius:50%;background:${r.color}"></span>${this.esc(r.name)}</span>`).join('');
-    const body = this.$('kg-d-body'); body.innerHTML = this.md(n.markdown); body.scrollTop = 0;
+    this.$('kg-d-body').innerHTML = this.md(n.markdown); this.$('kg-d-scroll').scrollTop = 0;
     this.$('kg-drawer').style.transform = 'translateX(0)';
     this.syncNodeListSel();
   }
   deselect() { this.selected = null; this.highlight(null); this.$('kg-drawer').style.transform = 'translateX(112%)'; this.syncNodeListSel(); }
   bindDrawer() {
     this.metaMode = 'clean';
-    this.metaCollapsed = false;                 // collapse survives page switches and reloads
-    try { this.metaCollapsed = localStorage.getItem('kg-meta-collapsed') === '1'; } catch (e) {}
-    this.$('kg-meta-toggle').addEventListener('click', () => {
-      this.metaCollapsed = !this.metaCollapsed;
-      try { localStorage.setItem('kg-meta-collapsed', this.metaCollapsed ? '1' : '0'); } catch (e) {}
-      this.applyMetaMode();
-    });
     this.$('kg-d-close').addEventListener('click', () => this.deselect());
     this.$('kg-meta-tabs').addEventListener('click', e => { const b = e.target.closest('.kg-gb'); if (!b) return; this.metaMode = b.dataset.m; this.applyMetaMode(); });
     this.$('kg-d-related').addEventListener('click', e => { const c = e.target.closest('.kg-chip'); if (c) this.select(c.dataset.id); });
@@ -887,11 +876,9 @@ class KG {
     this.applyMetaMode();
   }
   applyMetaMode() {
-    const raw = this.metaMode === 'raw', hid = this.metaCollapsed;
-    this.$('kg-d-meta-clean').style.display = (hid || raw) ? 'none' : '';
-    this.$('kg-d-meta-raw').style.display = (hid || !raw) ? 'none' : '';
-    this.$('kg-meta-tabs').style.display = hid ? 'none' : '';
-    const tg = this.$('kg-meta-toggle'); tg.textContent = hid ? '▸' : '▾'; tg.setAttribute('aria-expanded', String(!hid));
+    const raw = this.metaMode === 'raw';
+    this.$('kg-d-meta-clean').style.display = raw ? 'none' : '';
+    this.$('kg-d-meta-raw').style.display = raw ? '' : 'none';
     [...this.$('kg-meta-tabs').children].forEach(b => b.classList.toggle('on', b.dataset.m === this.metaMode));
   }
 
