@@ -295,11 +295,11 @@ _TEMPLATE = r"""<!DOCTYPE html>
 
   /* --- graph --- */
   .kg-edge { stroke: var(--kg-edge, #dbe3ec); stroke-width: 1; fill: none; transition: stroke .22s, opacity .22s; }
-  .kg-edge.dim { opacity: .3; }
+  .kg-edge.dim { opacity: 0; }
   .kg-edge.hi  { stroke: var(--kg-hi, #4f7aa8); stroke-width: 1.7; stroke-dasharray: 5 4; animation: kg-march .7s linear infinite; }
   .kg-edge-link { stroke: #c98a4e; stroke-width: 1.3; opacity: .6; }
   .kg-node { position: absolute; left: 0; top: 0; cursor: pointer; transition: opacity .5s ease; }
-  .kg-node.dim { opacity: .26; }
+  .kg-node.dim { opacity: 0; pointer-events: none; }
   .kg-dot { border-radius: 50%; transition: transform .15s ease; box-shadow: 0 1px 2.5px rgba(40,30,15,.16); }
   .kg-node:hover .kg-dot { transform: scale(1.13); }
   .kg-pulse { position: absolute; left: 0; top: 0; border-radius: 50%; border: 2px solid var(--kg-hi, #4f7aa8); opacity: .5; pointer-events: none; animation: kg-pulse 2.8s cubic-bezier(.4,0,.2,1) infinite; }
@@ -307,7 +307,7 @@ _TEMPLATE = r"""<!DOCTYPE html>
     font-family: var(--serif); font-size: 13px; font-weight: 600; color: #2c2c34;
     text-shadow: 0 0 3px var(--kg-bg), 0 0 3px var(--kg-bg), 0 0 6px var(--kg-bg); }
   .kg-label.vis, .kg-label.show { opacity: 1; }
-  .kg-label.dim { opacity: .12; }
+  .kg-label.dim { opacity: 0; }
   .kg-label.hero { font-size: 16px; font-weight: 700; color: #1c1c22; }
   @keyframes kg-march { to { stroke-dashoffset: -18; } }
   @keyframes kg-pulse { 0% { transform: scale(1); opacity: .5; } 70% { opacity: 0; } 100% { transform: scale(2.7); opacity: 0; } }
@@ -444,13 +444,6 @@ _TEMPLATE = r"""<!DOCTYPE html>
       <input id="kg-zoom" type="range" min="0.4" max="2.6" step="0.02" aria-label="Zoom">
       <button class="kg-step" data-z="+" aria-label="Zoom in">+</button>
     </div>
-    <div class="kg-cap" style="margin: 11px 0 6px;">Name density</div>
-    <div id="kg-denctl" class="kg-slider">
-      <button class="kg-step" data-d="-" aria-label="Fewer names">−</button>
-      <input id="kg-density" type="range" min="0" max="1" step="0.05" aria-label="Name density">
-      <button class="kg-step" data-d="+" aria-label="More names">+</button>
-    </div>
-
     <div class="kg-hr"></div>
     <div style="display: flex; gap: 18px; font-variant-numeric: tabular-nums;">
       <div><span class="kg-num">@@NNODES@@</span><span class="kg-unit">pages</span></div>
@@ -461,6 +454,13 @@ _TEMPLATE = r"""<!DOCTYPE html>
     <p style="margin: 8px 0 0; font-size: 10px; line-height: 1.5; color: #b7b6bd;">Regenerated automatically on every edit · @@BUILT@@</p>
 
     <div class="kg-hr"></div>
+    <div class="kg-row" style="margin-bottom: 8px;">
+      <div class="kg-cap">View</div>
+      <div id="kg-view" style="display: inline-flex; gap: 2px; background: rgba(243,239,230,0.7); border: 1px solid rgba(231,226,214,0.9); border-radius: 8px; padding: 2px;">
+        <button class="kg-gb" data-v="net">Net</button>
+        <button class="kg-gb" data-v="grid">Grid</button>
+      </div>
+    </div>
     <div class="kg-row" style="margin-bottom: 8px;">
       <div class="kg-cap">Pages</div>
       <div id="kg-groupby" style="display: inline-flex; gap: 2px; background: rgba(243,239,230,0.7); border: 1px solid rgba(231,226,214,0.9); border-radius: 8px; padding: 2px;">
@@ -539,6 +539,7 @@ class KG {
     this.bindNodeList();
     this.bindPanel();
     this.bindControls();
+    this.bindView();
   }
 
   // ---- model: nodes, edges, adjacency, display props ----
@@ -708,7 +709,7 @@ class KG {
       this.scale = Math.max(0.4, Math.min(2.6, this.scale * (e.deltaY < 0 ? 1.12 : 0.893)));
       this.tx = mx - wx * this.scale; this.ty = my - wy * this.scale; this.moved = true; this.lod(); this._syncZoom();
     }, { passive: false });
-    this._onResize = () => { this.measure(); if (!this.moved) { this.fit(); this.lod(); } };
+    this._onResize = () => { this.measure(); if (!this.moved) { if (this.gridView) this.gridLayout(); else this.fit(); this.lod(); this.render(); } };
     window.addEventListener('resize', this._onResize);
   }
 
@@ -810,6 +811,56 @@ class KG {
     });
   }
 
+  // ---- Net | Grid chooser (segmented, by the PAGES list): Net = force layout, Grid = screen-filling rectangular grid. ----
+  bindView() {
+    this.gridView = false;
+    const mark = v => [...this.$('kg-view').children].forEach(b => b.classList.toggle('on', b.dataset.v === v));
+    this.$('kg-view').addEventListener('click', e => {
+      const b = e.target.closest('.kg-gb'); if (!b) return;
+      const grid = b.dataset.v === 'grid';
+      if (grid === this.gridView) return;                                       // no-op when re-clicking the active view
+      this.gridView = grid;
+      if (grid) this.gridLayout(); else { this.restoreForce(); this.fit(); }
+      this.svg.style.opacity = grid ? '0.4' : '';                               // edges step back so labels read clean
+      this.lod(); this.render(); mark(b.dataset.v);
+    });
+    mark('net');                                                                 // force layout is already in place from run()
+  }
+  gridLayout() {
+    const N = this.nodes;
+    const widthOf = n => n.lab.scrollWidth > 0 ? n.lab.scrollWidth : n.name.length * 7.8 + 16;   // real width, text-length fallback
+    const minCellW = Math.max(190, Math.max(...N.map(widthOf)) + 34), minCellH = 80;            // floored by label size -> no overlap
+    const rank = {}; (this.C.order || []).forEach((t, i) => rank[t] = i);
+    const order = [...N].sort((a, b) => a.hero !== b.hero ? (a.hero ? -1 : 1)            // hero first
+      : (rank[a.type] ?? 99) - (rank[b.type] ?? 99)                                      // then group by type
+      || b.deg - a.deg);                                                                 // then by prominence
+    const padL = this.w < 760 ? 60 : 340, padR = 70, padY = 96, effW = Math.max(360, this.w - padL - padR), effH = Math.max(360, this.h - padY * 2);
+    // columns: match the canvas aspect ratio (fills the screen), but never so many that a column drops below label width
+    const cols = Math.max(1, Math.min(Math.floor(effW / minCellW), Math.round(Math.sqrt(N.length * (minCellH / minCellW) * (effW / effH)))));
+    const rows = Math.ceil(N.length / cols);
+    const cellW = Math.max(minCellW, effW / cols), cellH = Math.max(minCellH, effH / rows);      // grow cells to fill the canvas
+    order.forEach((n, i) => {
+      if (n._fbx === undefined) { n._fbx = n.bx; n._fby = n.by; n._famp = n.amp; n._flat = n.labelAt; }  // stash force state once
+      const col = i % cols, row = Math.floor(i / cols);
+      n.x = n.bx = (col - (cols - 1) / 2) * cellW;
+      n.y = n.by = (row - (rows - 1) / 2) * cellH;
+      n.amp = 0; n.labelAt = 0; n.lox = 0; n.loy = n.r + 9; n.lanchor = 'c';             // hold still, label below, always show
+    });
+    this.grid = { cols, rows, cellW, cellH };
+    this.scale = 1;                                                                       // screen-space layout: cells already in screen px, labels unscaled
+    this.tx = padL + effW / 2;                                                            // centred in the canvas area (right of the panel)
+    this.ty = this.h / 2;
+    this._syncZoom();
+  }
+  restoreForce() {
+    this.nodes.forEach(n => { n.x = n.bx = n._fbx; n.y = n.by = n._fby; n.amp = n._famp; n.labelAt = n._flat; });
+    this.nodes.forEach(n => {                                                            // re-fan label anchors outward
+      const dist = Math.hypot(n.x, n.y);
+      if (dist < 55) { n.lox = 0; n.loy = n.r + 9; n.lanchor = 'c'; }
+      else { const cx = n.x / dist, cy = n.y / dist, off = n.r + 7; n.lox = cx * off; n.loy = cy * off; n.lanchor = cx > 0.4 ? 'l' : cx < -0.4 ? 'r' : 'c'; }
+    });
+  }
+
   // ---- panel directory: every page grouped (type / folder / flat A–Z), name-sorted ----
   bindNodeList() {
     this.groupBy = 'type';
@@ -903,13 +954,10 @@ class KG {
 
   // ---- zoom + name-density sliders, each with clickable +/- steppers ----
   bindControls() {
-    const z = this.$('kg-zoom'), den = this.$('kg-density');
-    this.density = 0; den.value = 0; z.value = this.scale;
+    const z = this.$('kg-zoom');
+    this.density = 0; z.value = this.scale;
     z.addEventListener('input', () => this.setZoom(parseFloat(z.value)));
     this.$('kg-zoomctl').addEventListener('click', e => { const b = e.target.closest('.kg-step'); if (b) this.setZoom(this.scale * (b.dataset.z === '+' ? 1.12 : 0.893)); });
-    const setDen = v => { this.density = Math.max(0, Math.min(1, Math.round(v * 100) / 100)); den.value = this.density; this.lod(); };
-    den.addEventListener('input', () => setDen(parseFloat(den.value)));
-    this.$('kg-denctl').addEventListener('click', e => { const b = e.target.closest('.kg-step'); if (b) setDen(this.density + (b.dataset.d === '+' ? 0.1 : -0.1)); });
   }
   setZoom(s) {
     s = Math.max(0.4, Math.min(2.6, s));

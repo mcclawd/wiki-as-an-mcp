@@ -219,6 +219,54 @@ const t = (name, fn) => ({ name, fn });
       await page.waitForTimeout(450);
       if (await drawerOpen()) throw new Error('X did not close the scrolled card');
     }),
+
+    t('T16 Net|Grid chooser: Grid fills the screen as a rectangular grid, labels never overlap, Net restores', async () => {
+      await closeIfOpen();
+      const snap = () => page.evaluate(() => window._kg.nodes.map(n => [n.bx, n.by]));
+      const before = await snap();
+      await page.click('#kg-view [data-v="grid"]'); await page.waitForTimeout(550);
+      if (!await page.$eval('#kg-view [data-v="grid"]', el => el.classList.contains('on'))) throw new Error('Grid option not marked active');
+      const g = await page.evaluate(() => {
+        const k = window._kg, N = k.nodes, vis = N.filter(n => n.el.style.display !== 'none');
+        const xs = vis.map(n => n.bx), ys = vis.map(n => n.by);
+        const cols = new Set(xs.map(x => Math.round(x))).size;
+        const sx = vis.map(n => n.bx * k.scale + k.tx), sy = vis.map(n => n.by * k.scale + k.ty);
+        const gw = Math.max(...sx) - Math.min(...sx), gh = Math.max(...sy) - Math.min(...sy);
+        const canvasW = innerWidth - 340 - 70, canvasH = innerHeight - 192;
+        const L = vis.map(n => n.lab.getBoundingClientRect());
+        const hit = (a, b) => !(a.right <= b.left + 1 || b.right <= a.left + 1 || a.bottom <= b.top + 1 || b.bottom <= a.top + 1);
+        let ov = 0; for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) if (hit(L[i], L[j])) ov++;
+        return { cols, fillW: gw / canvasW, fillH: gh / canvasH, labelOverlap: ov, allLabels: N.every(n => n.lab.classList.contains('vis')) };
+      });
+      if (g.cols < 3) throw new Error('not a multi-column grid (cols=' + g.cols + ')');
+      if (g.fillW < 0.6 || g.fillH < 0.6) throw new Error('grid does not fill the screen: ' + g.fillW.toFixed(2) + 'x / ' + g.fillH.toFixed(2) + 'x of canvas');
+      if (g.labelOverlap > 0) throw new Error(g.labelOverlap + ' overlapping label pair(s)');
+      if (!g.allLabels) throw new Error('labels not all visible in grid mode');
+      await page.click('#kg-view [data-v="net"]'); await page.waitForTimeout(550);
+      if (!await page.$eval('#kg-view [data-v="net"]', el => el.classList.contains('on'))) throw new Error('Net option not marked active');
+      const after = await snap(), drift = after.reduce((s, [x, y], i) => s + Math.hypot(x - before[i][0], y - before[i][1]), 0);
+      if (drift > before.length * 3) throw new Error('Net did not restore positions: avg drift ' + (drift / before.length).toFixed(1) + 'px');
+    }),
+
+    t('T17 hovering a node fully hides non-neighbors and their labels (not just dims)', async () => {
+      await closeIfOpen();
+      const target = await page.evaluate(() => { const k = window._kg; return k.nodes.filter(n => !n.hero).sort((a, b) => b.deg - a.deg)[0].id; });
+      await page.evaluate(t => window._kg.highlight(t), target);
+      await page.waitForTimeout(650);
+      const res = await page.evaluate(t => {
+        const k = window._kg, on = new Set([t, ...k.adj[t]]);
+        let bad = 0;
+        k.nodes.forEach(n => { const op = +getComputedStyle(n.el).opacity, lop = +getComputedStyle(n.lab).opacity;
+          if (on.has(n.id) ? (op < 0.99 || lop < 0.99) : (op > 0.02 || lop > 0.02)) bad++; });
+        return { bad, neighbors: on.size };
+      }, target);
+      if (res.neighbors < 3) throw new Error('hover target has too few neighbors to exercise the test');
+      if (res.bad > 0) throw new Error(res.bad + ' node/label(s) not fully hidden or shown on hover');
+      await page.evaluate(() => window._kg.highlight(null));
+      await page.waitForTimeout(650);
+      const stuck = await page.evaluate(() => window._kg.nodes.filter(n => +getComputedStyle(n.el).opacity < 0.99).length);
+      if (stuck > 0) throw new Error(stuck + ' node(s) stayed hidden after moving away');
+    }),
   ];
 
   for (const { name, fn } of tests) {
