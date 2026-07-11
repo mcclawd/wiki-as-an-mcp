@@ -387,7 +387,7 @@ _TEMPLATE = r"""<!DOCTYPE html>
   :root[data-theme="dark"] #kg-drawer { background: #1a1d25 !important; border-color: #2c313c !important; box-shadow: -20px 0 50px rgba(0,0,0,0.5) !important; }
   :root[data-theme="dark"] #kg-drawer > div:first-child { border-bottom-color: #262b35 !important; }
   :root[data-theme="dark"] #kg-d-type { color: #8e8c96 !important; }
-  :root[data-theme="dark"] #kg-d-close { background: #2a2f3a !important; color: #b8b6c0 !important; border-color: #3a4150 !important; }
+  :root[data-theme="dark"] #kg-d-close, :root[data-theme="dark"] #kg-meta-toggle { background: #2a2f3a !important; color: #b8b6c0 !important; border-color: #3a4150 !important; }
   :root[data-theme="dark"] #kg-d-title { color: #f1eff4 !important; }
   :root[data-theme="dark"] #kg-d-path { color: #87858f !important; }
   :root[data-theme="dark"] #kg-d-body { color: #c4c2cc !important; }
@@ -474,7 +474,7 @@ _TEMPLATE = r"""<!DOCTYPE html>
   </div>
 </div>
 
-<aside id="kg-drawer" style="position: fixed; inset: 26px 26px 26px min(338px, 32vw); z-index: 30; transform: translateX(112%); transition: transform .4s cubic-bezier(.4,0,.2,1); display: flex; flex-direction: column; background: #fff; border: 1px solid #e7e2d6; border-radius: 18px; box-shadow: -20px 0 50px rgba(60,48,28,0.14);">
+<aside id="kg-drawer" style="position: fixed; inset: 26px 26px 26px 338px; z-index: 30; transform: translateX(112%); transition: transform .4s cubic-bezier(.4,0,.2,1); display: flex; flex-direction: column; background: #fff; border: 1px solid #e7e2d6; border-radius: 18px; box-shadow: -20px 0 50px rgba(60,48,28,0.14);">
   <div style="padding: 24px 24px 16px; padding-left: max(24px, calc((100% - 760px) / 2)); padding-right: max(24px, calc((100% - 760px) / 2)); border-bottom: 1px solid #ece7dc; flex: none; max-height: 42vh; overflow-y: auto;">
     <div class="kg-row" style="align-items: flex-start; gap: 14px;">
       <div id="kg-d-type" style="display: inline-flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 700; letter-spacing: .8px; color: #8a8992;"></div>
@@ -485,9 +485,12 @@ _TEMPLATE = r"""<!DOCTYPE html>
     <div id="kg-d-meta" style="margin-top: 16px;">
       <div class="kg-row" style="margin-bottom: 9px;">
         <div class="kg-cap">Frontmatter</div>
-        <div id="kg-meta-tabs" class="kg-meta-tabs">
-          <button class="kg-gb" data-m="clean">Details</button>
-          <button class="kg-gb" data-m="raw">Raw</button>
+        <div style="display: inline-flex; align-items: center; gap: 6px;">
+          <div id="kg-meta-tabs" class="kg-meta-tabs">
+            <button class="kg-gb" data-m="clean">Details</button>
+            <button class="kg-gb" data-m="raw">Raw</button>
+          </div>
+          <button id="kg-meta-toggle" aria-label="Collapse frontmatter" aria-expanded="true" style="width: 22px; height: 22px; border-radius: 7px; background: rgba(243,239,230,0.65); border: 1px solid #e7e2d6; color: #8a6a3f; cursor: pointer; font-size: 11px; line-height: 1; display: inline-flex; align-items: center; justify-content: center;">▾</button>
         </div>
       </div>
       <div id="kg-d-meta-clean"></div>
@@ -688,16 +691,17 @@ class KG {
 
   bindCamera() {
     const st = this.stage; st.style.cursor = 'grab';
-    let pressId = null, panning = false, lx = 0, ly = 0, moved = 0;
-    st.addEventListener('pointerdown', e => { const el = e.target.closest('.kg-node'); lx = e.clientX; ly = e.clientY; moved = 0; pressId = el && el.dataset.id; panning = !el; if (panning) st.style.cursor = 'grabbing'; });
+    let pressId = null, panning = false, down = false, lx = 0, ly = 0, moved = 0;
+    st.addEventListener('pointerdown', e => { const el = e.target.closest('.kg-node'); lx = e.clientX; ly = e.clientY; moved = 0; down = true; pressId = el && el.dataset.id; panning = !el; if (panning) st.style.cursor = 'grabbing'; });
     this._onMove = e => {
-      if (pressId == null && !panning) return;
+      if (!down || (pressId == null && !panning)) return;
       const dx = e.clientX - lx, dy = e.clientY - ly; lx = e.clientX; ly = e.clientY; moved += Math.abs(dx) + Math.abs(dy);
       if (panning) { this.tx += dx; this.ty += dy; this.moved = true; }
     };
     this._onUp = () => {
+      if (!down) return;                       // press began outside the stage (e.g. in the reading card): not ours
       if (moved < 5) { if (pressId != null) this.select(pressId); else if (this.selected) this.deselect(); }
-      if (panning) st.style.cursor = 'grab'; pressId = null; panning = false;
+      if (panning) st.style.cursor = 'grab'; pressId = null; panning = false; down = false;
     };
     window.addEventListener('pointermove', this._onMove);
     window.addEventListener('pointerup', this._onUp);
@@ -756,6 +760,13 @@ class KG {
   deselect() { this.selected = null; this.highlight(null); this.$('kg-drawer').style.transform = 'translateX(112%)'; this.syncNodeListSel(); }
   bindDrawer() {
     this.metaMode = 'clean';
+    this.metaCollapsed = false;                 // collapse survives page switches and reloads
+    try { this.metaCollapsed = localStorage.getItem('kg-meta-collapsed') === '1'; } catch (e) {}
+    this.$('kg-meta-toggle').addEventListener('click', () => {
+      this.metaCollapsed = !this.metaCollapsed;
+      try { localStorage.setItem('kg-meta-collapsed', this.metaCollapsed ? '1' : '0'); } catch (e) {}
+      this.applyMetaMode();
+    });
     this.$('kg-d-close').addEventListener('click', () => this.deselect());
     this.$('kg-meta-tabs').addEventListener('click', e => { const b = e.target.closest('.kg-gb'); if (!b) return; this.metaMode = b.dataset.m; this.applyMetaMode(); });
     this.$('kg-d-related').addEventListener('click', e => { const c = e.target.closest('.kg-chip'); if (c) this.select(c.dataset.id); });
@@ -876,9 +887,11 @@ class KG {
     this.applyMetaMode();
   }
   applyMetaMode() {
-    const raw = this.metaMode === 'raw';
-    this.$('kg-d-meta-clean').style.display = raw ? 'none' : '';
-    this.$('kg-d-meta-raw').style.display = raw ? '' : 'none';
+    const raw = this.metaMode === 'raw', hid = this.metaCollapsed;
+    this.$('kg-d-meta-clean').style.display = (hid || raw) ? 'none' : '';
+    this.$('kg-d-meta-raw').style.display = (hid || !raw) ? 'none' : '';
+    this.$('kg-meta-tabs').style.display = hid ? 'none' : '';
+    const tg = this.$('kg-meta-toggle'); tg.textContent = hid ? '▸' : '▾'; tg.setAttribute('aria-expanded', String(!hid));
     [...this.$('kg-meta-tabs').children].forEach(b => b.classList.toggle('on', b.dataset.m === this.metaMode));
   }
 
