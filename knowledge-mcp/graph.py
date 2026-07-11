@@ -384,7 +384,7 @@ _TEMPLATE = r"""<!DOCTYPE html>
   :root[data-theme="dark"] .kg-item { color: #c4c2cc; }
   :root[data-theme="dark"] .kg-item:hover { background: rgba(255,255,255,0.06); }
   :root[data-theme="dark"] .kg-item.sel { background: #2d333f; color: #f1eff4; }
-  :root[data-theme="dark"] #kg-drawer { background: #1a1d25 !important; border-left-color: #2c313c !important; box-shadow: -20px 0 50px rgba(0,0,0,0.5) !important; }
+  :root[data-theme="dark"] #kg-drawer { background: #1a1d25 !important; border-color: #2c313c !important; box-shadow: -20px 0 50px rgba(0,0,0,0.5) !important; }
   :root[data-theme="dark"] #kg-drawer > div:first-child { border-bottom-color: #262b35 !important; }
   :root[data-theme="dark"] #kg-d-type { color: #8e8c96 !important; }
   :root[data-theme="dark"] #kg-d-close { background: #2a2f3a !important; color: #b8b6c0 !important; border-color: #3a4150 !important; }
@@ -474,8 +474,8 @@ _TEMPLATE = r"""<!DOCTYPE html>
   </div>
 </div>
 
-<aside id="kg-drawer" style="position: fixed; top: 0; right: 0; height: 100vh; width: clamp(360px, 30vw, 450px); z-index: 30; transform: translateX(112%); transition: transform .4s cubic-bezier(.4,0,.2,1); display: flex; flex-direction: column; background: #fff; border-left: 1px solid #e7e2d6; box-shadow: -20px 0 50px rgba(60,48,28,0.14);">
-  <div style="padding: 24px 24px 16px; border-bottom: 1px solid #ece7dc; flex: none; max-height: 42vh; overflow-y: auto;">
+<aside id="kg-drawer" style="position: fixed; inset: 26px 26px 26px min(338px, 32vw); z-index: 30; transform: translateX(112%); transition: transform .4s cubic-bezier(.4,0,.2,1); display: flex; flex-direction: column; background: #fff; border: 1px solid #e7e2d6; border-radius: 18px; box-shadow: -20px 0 50px rgba(60,48,28,0.14);">
+  <div style="padding: 24px 24px 16px; padding-left: max(24px, calc((100% - 760px) / 2)); padding-right: max(24px, calc((100% - 760px) / 2)); border-bottom: 1px solid #ece7dc; flex: none; max-height: 42vh; overflow-y: auto;">
     <div class="kg-row" style="align-items: flex-start; gap: 14px;">
       <div id="kg-d-type" style="display: inline-flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 700; letter-spacing: .8px; color: #8a8992;"></div>
       <button id="kg-d-close" aria-label="Close" style="background: #f3efe6; color: #6c6b73; border: 1px solid #e7e2d6; width: 30px; height: 30px; border-radius: 50%; font-size: 18px; line-height: 1; cursor: pointer; flex: none;">×</button>
@@ -495,7 +495,7 @@ _TEMPLATE = r"""<!DOCTYPE html>
     </div>
     <div id="kg-d-related" style="display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px;"></div>
   </div>
-  <div id="kg-d-body" style="flex: 1; min-height: 0; overflow: auto; padding: 18px 24px 30px; font-size: 13px; line-height: 1.72; color: #3c3c44;"></div>
+  <div id="kg-d-body" style="flex: 1; min-height: 0; overflow: auto; padding: 18px 24px 30px; padding-left: max(24px, calc((100% - 760px) / 2)); padding-right: max(24px, calc((100% - 760px) / 2)); font-size: 13px; line-height: 1.72; color: #3c3c44;"></div>
 </aside>
 
 <script>window.GRAPH_DATA = @@PAYLOAD@@;</script>
