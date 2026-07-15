@@ -5,6 +5,7 @@
 ![Maintained](https://img.shields.io/badge/Maintained%3F-yes-green.svg)
 ![Issues](https://img.shields.io/github/issues/taikunudel/wiki-as-an-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/taikunudel/wiki-as-an-mcp/blob/main/LICENSE)
+[![BundleDex](https://bundledex.net/badge/wiki-as-an-mcp.svg)](https://bundledex.net/bundles/wiki-as-an-mcp/)
 
 **English** | [中文](#中文版)
 
